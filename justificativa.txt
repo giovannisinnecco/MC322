@@ -1,0 +1,18 @@
+Justificativa da Escolha do Tema
+
+A escolha por simular uma Fábrica focada na produção de microcontroladores STM32 surgiu da nossa vivência prática direta 
+com a área de Controle e Automação. Lidamos com esse tipo de hardware de forma constante nas aulas da faculdade e em projetos de extensão, seja 
+para rodar algoritmos ou para atuar como a unidade de controle eletrônico (ECU) e telemetria em protótipos veiculares complexos. 
+
+Queríamos evitar opções genéricas e desenvolver um projeto que refletisse o rigor da nossa área, onde se lida com processos físicos reais. 
+A fabricação de semicondutores nos dá um cenário de alta tecnologia que se alinha perfeitamente com nossos interesses profissionais e possui 
+uma lógica de estados operacionais muito rica paraexplorarmos em código.
+
+Visão de Expansão Futura
+Para os próximos laboratórios, a planta tem um potencial natural gigantesco para ganhar complexidade, já que a fabricação real de um chip 
+possui dezenas de etapas interdependentes. Planejamos expandir a linha introduzindo novos equipamentos e fases de produção intermediárias,
+como fornos de dopagem química, corrosão por plasma e, no fim da linha, as máquinas de encapsulamento de resina.
+Na parte da movimentação, podemos adicionar braços robóticos e veículos autoguiados atuando em conjunto com a esteira para rotear os lotes. 
+Por fim, a estação de inspeção atual, que é bem simplificada, será substituída por um controle de qualidade inteligente e rigoroso — 
+simulando uma triagem óptica automatizada capaz de rejeitar chips defeituosos, descartar matérias-primas comprometidas e gerar métricas de 
+eficiência da linha de produção.
