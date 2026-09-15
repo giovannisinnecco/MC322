@@ -1,130 +1,162 @@
+import java.util.Locale;
+import java.util.NoSuchElementException;
 import java.util.Scanner;
 
+// Inicia a fábrica e cuida da conversa com o usuário.
 public class Main {
-    
+
+    // Mantém a ordem dos modelos usada pelo menu.
+    private static final String[] TIPOS_PRODUTO = {"STM32G", "STM32F", "STM32H"};
+
+    // Monta o turno e mantém o sistema aberto até a saída.
     public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-
-        System.out.println("=======================================================");
-        System.out.println("           SILICON FAB - MICROCONTROLADORES STM32      ");
-        System.out.println("=======================================================");
-        System.out.println("Aqui transformamos Silício em microcontroladores");
-        System.out.println("da família STM32.");
-        System.out.println("Desenvolvido por: Giovanni Innecco e Rodrigo Soares");
-        System.out.println("=======================================================\n");
-
-        MateriaPrima silicio = new MateriaPrima(1, "Silício", 1000.0, "gramas", 10.0);
-
-        Produto stm32f4 = new Produto(1, "STM32F401 (Lote)", 5.0);
-        stm32f4.definirDemandaMateriaPrima(5.0); 
-        
-        Produto stm32g0 = new Produto(2, "STM32G071 (Lote)", 3.0);
-        stm32g0.definirDemandaMateriaPrima(3.0);
-        
-        Produto stm32h7 = new Produto(3, "STM32H753 (Lote)", 10.0);
-        stm32h7.definirDemandaMateriaPrima(10.0);
-
-        Maquina fotolitografia = new Maquina("Máquina de Fotolitografia EUV", 50.0);
-        Esteira esteira = new Esteira(100.0);
-        EstacaoInspecao microscopio = new EstacaoInspecao();
-
-        System.out.println("[SISTEMA] Equipamentos inicializados e prontos para operar.\n");
-
-
-        while (true) {
-            System.out.println("\n=======================================================");
-            System.out.println("                 MENU PRINCIPAL                        ");
-            System.out.println("=======================================================");
-            System.out.println("1 - Iniciar produção");
-            System.out.println("2 - Consultar estoque de matéria-prima");
-            System.out.println("3 - Sair");
-            System.out.print("Escolha uma opção: ");
-
-            while (!scanner.hasNextInt()) {
-                System.out.println("\n[ERRO] Entrada inválida. Por favor, digite apenas números.");
-                System.out.print("Escolha uma opção: ");
-                scanner.next();
-            }
-            int opcao = scanner.nextInt();
-
-            if (opcao == 1) {
-                System.out.println("\n[SISTEMA] Acessando módulo de produção...");
-                System.out.println("\nProdutos Disponíveis:");
-                System.out.println("1 - " + stm32f4.getNome());
-                System.out.println("2 - " + stm32g0.getNome());
-                System.out.println("3 - " + stm32h7.getNome());
-                System.out.print("Selecione o produto (1-3): ");
-                while (!scanner.hasNextInt()) {
-                    System.out.println("[ERRO] Entrada inválida. Digite um número de 1 a 3.");
-                    scanner.next();
-                }
-                int escolhaProduto = scanner.nextInt();
-
-                Produto produtoSelecionado = null;
-                if (escolhaProduto == 1) produtoSelecionado = stm32f4;
-                else if (escolhaProduto == 2) produtoSelecionado = stm32g0;
-                else if (escolhaProduto == 3) produtoSelecionado = stm32h7;
-                else {
-                    System.out.println("[ERRO] Opção de produto inválida.");
-                    continue;
-                }
-
-                System.out.print("Informe a demanda de matéria-prima (gramas): ");
-                while (!scanner.hasNextDouble()) {
-                    System.out.println("[ERRO] Entrada inválida. Digite um valor numérico para a demanda.");
-                    scanner.next();
-                }
-                double demanda = scanner.nextDouble();
-
-                System.out.println("\n[SISTEMA] Iniciando fluxo de produção...");
-
-                if (!silicio.verificarDisponibilidade(demanda)) {
-                    System.out.println("[ERRO] Estoque insuficiente de " + silicio.getNome() + ".");
-                    continue; 
-                }
-                System.out.println("[OK] Demanda aprovada. Material reservado.");
-
-                esteira.ligar();
-                fotolitografia.ligar();
-                microscopio.ativar();
-                System.out.println("[OK] Equipamentos energizados e operantes.");
-
-                esteira.adicionarItem(silicio, demanda);
-                Object itemTransportado = esteira.removerItem();
-                System.out.println("[OK] Matéria-prima transportada até a " + fotolitografia.getNome() + ".");
-
-                fotolitografia.processar((MateriaPrima) itemTransportado, demanda); 
-                produtoSelecionado.processar(); 
-                System.out.println("[OK] Processamento concluído. Microcontrolador " + produtoSelecionado.getNome() + " criado.");
-
-                esteira.adicionarItem(produtoSelecionado, 1.0);
-                Object produtoFinal = esteira.removerItem();
-                System.out.println("[OK] Produto transportado para a área de qualidade.");
-
-                microscopio.inspecionar((Produto) produtoFinal);
-                
-                esteira.desligar();
-                fotolitografia.desligar();
-                microscopio.desativar();
-
-                System.out.println("\n=== PRODUÇÃO CONCLUÍDA COM SUCESSO ===");
-                
-            } else if (opcao == 2) {
-                System.out.println("\n=== ESTOQUE ATUAL ===");
-                System.out.println("Material: " + silicio.getNome());
-                System.out.println("Quantidade disponível: " + silicio.getQuantidade() + " gramas");
-                
-            } else if (opcao == 3) {
-                System.out.println("\n[SISTEMA] Desligando equipamentos e encerrando o turno. Até logo!");
-                break;
-                
-            } else {
-                System.out.println("\n[ERRO] Opção inválida. Digite 1, 2 ou 3.");
-            }
+        Locale.setDefault(Locale.forLanguageTag("pt-BR"));
+        MateriaPrima silicio = new MateriaPrima(1, "Silício", 100.0,
+                "unidades de material", 10.0, 2.0);
+        GerenciadorProducao gerenciador = new GerenciadorProducao(silicio, 1000.0);
+        for (String tipo : TIPOS_PRODUTO) {
+            gerenciador.registrarDemanda(tipo, 0);
         }
 
-        scanner.close();
+        exibirIntroducao();
+        try (Scanner scanner = new Scanner(System.in)) {
+            executarMenu(scanner, gerenciador);
+        } catch (NoSuchElementException erro) {
+            System.out.println("\n[SISTEMA] Entrada encerrada. Finalizando o turno.");
+        }
+        exibirResumo(gerenciador);
+        System.out.println("[SISTEMA] Turno encerrado. Até logo!");
+    }
 
-        
+    // Apresenta o tema e as regras básicas da simulação.
+    private static void exibirIntroducao() {
+        System.out.println("=======================================================");
+        System.out.println("          SILICON FAB - MICROCONTROLADORES STM32");
+        System.out.println("=======================================================");
+        System.out.println("Do silício ao microcontrolador: STM32G, STM32F e STM32H.");
+        System.out.println("Fotolitografia -> Encapsulamento -> Inspeção");
+        System.out.println("Registre quantas unidades aprovadas deseja produzir.");
+        System.out.println("Rejeições geram novas tentativas enquanto houver recursos.");
+        System.out.println("O material é comprado pelo menu; cada tentativa tem custo.");
+        System.out.println("Consumos, tempos e qualidade são fictícios nesta simulação.");
+        System.out.println("Desenvolvido por: Giovanni Innecco e Rodrigo Soares");
+        System.out.println("=======================================================");
+    }
+
+    // Recebe as escolhas e encaminha cada ação ao gerenciador.
+    private static void executarMenu(Scanner scanner, GerenciadorProducao gerenciador) {
+        while (true) {
+            exibirMenu(gerenciador);
+            int opcao = lerInteiro(scanner, "Escolha uma opção (0-10): ", 0, 10);
+            if (opcao == 0) {
+                return;
+            }
+            try {
+                if (opcao >= 1 && opcao <= 3) {
+                    String tipo = TIPOS_PRODUTO[opcao - 1];
+                    System.out.println("Atualizar " + tipo + ": substitui a pendência atual.");
+                    int quantidade = lerInteiro(scanner,
+                            "Informe a nova quantidade pendente (0 para encerrar a pendência): ",
+                            0, Integer.MAX_VALUE);
+                    gerenciador.atualizarDemanda(tipo, quantidade);
+                    System.out.println("[OK] Demanda atualizada: " + quantidade + " unidades pendentes.");
+                } else if (opcao >= 4 && opcao <= 6) {
+                    gerenciador.fabricarDemanda(TIPOS_PRODUTO[opcao - 4]);
+                } else {
+                    switch (opcao) {
+                        case 7:
+                            gerenciador.exibirArmazem();
+                            break;
+                        case 8:
+                            gerenciador.exibirEstoque();
+                            break;
+                        case 9:
+                            gerenciador.exibirEstoque();
+                            double quantidade = lerQuantidadeCompra(scanner);
+                            gerenciador.comprarMateriaPrima(quantidade);
+                            System.out.println("[OK] Compra realizada: " + quantidade + " unidades de material.");
+                            gerenciador.exibirBudget();
+                            break;
+                        case 10:
+                            exibirResumo(gerenciador);
+                            break;
+                        default:
+                            throw new IllegalArgumentException("Opção inválida.");
+                    }
+                }
+            } catch (IllegalArgumentException | IllegalStateException erro) {
+                System.out.println("[ERRO] " + erro.getMessage());
+            }
+        }
+    }
+
+    // Mostra as opções e o estado atual das demandas.
+    private static void exibirMenu(GerenciadorProducao gerenciador) {
+        System.out.println("\n================ MENU DA SILICON FAB =================");
+        gerenciador.exibirBudget();
+        System.out.println("\nATUALIZAR DEMANDAS");
+        for (int i = 0; i < TIPOS_PRODUTO.length; i++) {
+            String tipo = TIPOS_PRODUTO[i];
+            System.out.println((i + 1) + " - Atualizar " + tipo
+                    + " (pendentes: " + gerenciador.getQuantidadePendente(tipo) + ")");
+        }
+        System.out.println("\nFABRICAR");
+        for (int i = 0; i < TIPOS_PRODUTO.length; i++) {
+            System.out.println((i + 4) + " - Fabricar " + TIPOS_PRODUTO[i]);
+        }
+        System.out.println("\nCONSULTAR");
+        System.out.println("7 - Ver armazém");
+        System.out.println("8 - Ver estoque de matéria-prima");
+        System.out.println("10 - Ver resumo do turno e demandas");
+        System.out.println("\nCOMPRAR MATÉRIA-PRIMA");
+        System.out.println("9 - Comprar silício");
+        System.out.println("\n0 - Sair");
+    }
+
+    // Lê um inteiro válido dentro do intervalo pedido.
+    private static int lerInteiro(Scanner scanner, String mensagem, int minimo, int maximo) {
+        while (true) {
+            System.out.print(mensagem);
+            String entrada = scanner.nextLine().trim();
+            try {
+                int valor = Integer.parseInt(entrada);
+                if (valor >= minimo && valor <= maximo) {
+                    return valor;
+                }
+            } catch (NumberFormatException erro) {
+                // A mensagem abaixo orienta uma nova tentativa.
+            }
+            System.out.println("[ERRO] Digite um número inteiro entre " + minimo + " e " + maximo + ".");
+        }
+    }
+
+    // Lê uma compra positiva com ponto ou vírgula decimal.
+    private static double lerQuantidadeCompra(Scanner scanner) {
+        while (true) {
+            System.out.print("Quantidade de material a comprar (ex.: 5 ou 2,5; sem separador de milhar): ");
+            String entrada = scanner.nextLine().trim();
+            if (entrada.matches("[0-9]+([.,][0-9]+)?")) {
+                double quantidade = Double.parseDouble(entrada.replace(',', '.'));
+                if (Double.isFinite(quantidade) && quantidade > 0.0) {
+                    return quantidade;
+                }
+            }
+            System.out.println("[ERRO] Digite uma quantidade numérica, finita e maior que zero.");
+        }
+    }
+
+    // Resume recursos, demandas e resultados do turno.
+    private static void exibirResumo(GerenciadorProducao gerenciador) {
+        System.out.println("\n================ RESUMO DO TURNO =====================");
+        gerenciador.exibirBudget();
+        gerenciador.exibirEstoque();
+        gerenciador.exibirDemandas();
+        int totalCriado = Produto.getTotalProdutosFabricados();
+        int totalArmazenado = gerenciador.getTotalArmazenado();
+        System.out.println("Microcontroladores produzidos (inclui rejeitados): " + totalCriado);
+        System.out.println("Aprovados no armazém: " + totalArmazenado);
+        System.out.println("Rejeitados: " + (totalCriado - totalArmazenado));
+        System.out.println("Tempo total de produção: " + gerenciador.getTempoTotalProducao()
+                + " unidades de tempo.");
     }
 }

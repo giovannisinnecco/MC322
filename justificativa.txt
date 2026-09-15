@@ -1,18 +1,127 @@
-Justificativa da Escolha do Tema
+SILICON FAB - JUSTIFICATIVA DA TAREFA 2
+Giovanni Innecco (RA 282589) e Rodrigo Soares (RA 197361)
 
-A escolha por simular uma Fábrica focada na produção de microcontroladores STM32 surgiu da nossa vivência prática direta 
-com a área de Controle e Automação. Lidamos com esse tipo de hardware de forma constante nas aulas da faculdade e em projetos de extensão, seja 
-para rodar algoritmos ou para atuar como a unidade de controle eletrônico (ECU) e telemetria em protótipos veiculares complexos. 
+1. Escolha do tema e relação com Controle e Automação
 
-Queríamos evitar opções genéricas e desenvolver um projeto que refletisse o rigor da nossa área, onde se lida com processos físicos reais. 
-A fabricação de semicondutores nos dá um cenário de alta tecnologia que se alinha perfeitamente com nossos interesses profissionais e possui 
-uma lógica de estados operacionais muito rica paraexplorarmos em código.
+Escolhemos desenvolver uma fábrica de microcontroladores STM32 devido à relação direta desse tema com nossa formação em Controle e Automação. Na justificativa da Tarefa 1, destacamos nosso contato com esse tipo de hardware em aulas e projetos de extensão, especialmente em aplicações envolvendo sistemas de controle, ECU e telemetria. Mantivemos o tema nesta etapa para que as classes e os elementos do sistema permanecessem inseridos em um contexto com o qual temos familiaridade.
 
-Visão de Expansão Futura
-Para os próximos laboratórios, a planta tem um potencial natural gigantesco para ganhar complexidade, já que a fabricação real de um chip 
-possui dezenas de etapas interdependentes. Planejamos expandir a linha introduzindo novos equipamentos e fases de produção intermediárias,
-como fornos de dopagem química, corrosão por plasma e, no fim da linha, as máquinas de encapsulamento de resina.
-Na parte da movimentação, podemos adicionar braços robóticos e veículos autoguiados atuando em conjunto com a esteira para rotear os lotes. 
-Por fim, a estação de inspeção atual, que é bem simplificada, será substituída por um controle de qualidade inteligente e rigoroso — 
-simulando uma triagem óptica automatizada capaz de rejeitar chips defeituosos, descartar matérias-primas comprometidas e gerar métricas de 
-eficiência da linha de produção.
+A Silicon Fab consiste em uma simulação didática e simplificada de uma fábrica de microcontroladores. O objetivo não é reproduzir integralmente o processo industrial de fabricação de semicondutores. Dessa forma, valores como consumo de silício, tempos de processamento, custos e níveis de qualidade foram definidos especificamente para o exercício e não correspondem às especificações reais dos componentes.
+
+2. Evolução da fábrica
+
+Na primeira versão do projeto, havia apenas um fluxo básico de produção, e a etapa de inspeção aprovava todos os produtos. Nesta segunda versão, a fábrica foi ampliada para incluir três tipos de microcontroladores, três tipos de máquinas, demandas por produtos finais, inspeção com comportamento probabilístico, orçamento e armazém.
+
+Como a tarefa exige a utilização de hierarquias de produtos e máquinas, criamos as classes STM32G, STM32F e STM32H como subclasses de Produto, enquanto MaquinaFotolitografia, MaquinaEncapsulamento e EstacaoInspecao são subclasses de Maquina.
+
+No modelo desenvolvido, o encapsulamento desempenha o papel da etapa de embalagem solicitada pelo enunciado. Ele representa, de forma simplificada, a proteção do chip e sua preparação para conexão com elementos externos.
+
+Cada objeto Produto representa uma unidade individual de microcontrolador, possuindo seu próprio identificador e resultado de inspeção. Essa escolha permite realizar rejeições individualmente e contabilizar de forma clara as unidades produzidas, rejeitadas e armazenadas.
+
+3. Produtos, recursos e fluxo de produção
+
+Os parâmetros definidos para cada produto são:
+
+STM32G: 3 unidades de material, 2 unidades de tempo e qualidade 0,5.
+STM32F: 5 unidades de material, 4 unidades de tempo e qualidade 0,7.
+STM32H: 10 unidades de material, 6 unidades de tempo e qualidade 0,9.
+
+O atributo qualidade representa a qualidade associada ao produto e influencia diretamente a chance de rejeição durante a inspeção, conforme a orientação do enunciado. Esses valores fazem parte exclusivamente da modelagem utilizada no projeto e não significam que um modelo comercial real possua qualidade inferior ou superior a outro.
+
+Cada unidade produzida percorre, sequencialmente, as etapas de fotolitografia, encapsulamento e inspeção. A esteira é responsável pelo transporte dos produtos por meio de uma fila. O silício necessário à fabricação é retirado diretamente do estoque pelo gerenciador de produção.
+
+Somente os produtos aprovados pela avaliação final da estação de inspeção são encaminhados ao armazém.
+
+4. Falhas e inspeção
+
+O enunciado estabelece que as etapas de processamento e embalagem podem aumentar o risco acumulado de falha do produto, enquanto a própria inspeção também pode apresentar falhas.
+
+Para representar esse comportamento, definimos que:
+
+A fotolitografia possui 20% de chance de acrescentar 0,10 à probabilidade de falha acumulada.
+O encapsulamento possui 10% de chance de acrescentar 0,05 à probabilidade de falha acumulada.
+
+A avaliação inicial realizada pela inspeção utiliza a seguinte expressão:
+
+chanceRejeicao = qualidade * (0.10 + probabilidadeFalhaAcumulada)
+
+Para um mesmo nível de risco acumulado durante o fluxo de produção, a chance de rejeição é diretamente proporcional à qualidade do produto.
+
+Após essa avaliação, é realizado um sorteio independente no qual existe 5% de chance de a estação de inspeção falhar e liberar o produto, independentemente do resultado inicial. Essa situação representa uma falha de detecção: uma unidade que deveria ser rejeitada pode ser aprovada incorretamente. Caso a avaliação inicial já determine a aprovação do produto, ele permanece aprovado.
+
+Esse comportamento constitui uma decisão de implementação do grupo. O enunciado exige a possibilidade de uma inspeção incorreta, mas não determina exatamente seu mecanismo nem exige a representação dos dois possíveis tipos de erro.
+
+Se a probabilidade inicial de rejeição for representada por p, a probabilidade final de rejeição será:
+
+0.95 * p
+
+Consequentemente, no fluxo da fábrica, a probabilidade final pode ser expressa como:
+
+0.95 * qualidade * (0.10 + probabilidadeFalhaAcumulada)
+
+Na ausência de risco acumulado adicional, as probabilidades finais de rejeição são:
+
+STM32G: 4,75%.
+STM32F: 6,65%.
+STM32H: 8,55%.
+
+5. Demandas e orçamento
+
+No sistema, a demanda representa a quantidade de unidades que ainda precisam ser aprovadas para que determinado pedido seja atendido.
+
+Optamos por repetir automaticamente as tentativas de produção quando ocorre uma rejeição, até que a demanda seja completamente atendida ou não existam recursos suficientes para iniciar um novo ciclo completo de fabricação.
+
+Uma unidade rejeitada continua consumindo material, custo operacional e tempo de produção, mas não reduz a quantidade pendente da demanda. Caso a produção seja interrompida por falta de recursos, as unidades que já foram aprovadas são preservadas, permitindo a continuidade do atendimento posteriormente.
+
+Ao atualizar uma demanda, a nova quantidade informada substitui sua quantidade pendente atual. A utilização do valor zero encerra a pendência, mas não remove produtos já existentes no armazém. Essas regras são decisões de modelagem adotadas pelo grupo, uma vez que o enunciado não especifica detalhadamente o comportamento de atualizações parciais ou mecanismos automáticos de reposição.
+
+O orçamento inicial da fábrica é de R$ 1.000,00, acompanhado de 100 unidades de material já disponíveis em estoque.
+
+Os custos definidos foram:
+
+Compra de material: R$ 2,00 por unidade.
+Fotolitografia: R$ 10,00 por microcontrolador.
+Encapsulamento: R$ 5,00 por microcontrolador.
+Inspeção: R$ 3,00 por microcontrolador.
+
+O orçamento é debitado tanto na aquisição de matéria-prima quanto na operação das máquinas, conforme exigido pela tarefa. Entretanto, a retirada de material já presente no estoque não gera uma segunda cobrança, pois seu custo foi considerado no momento da compra.
+
+A aquisição de matéria-prima é realizada manualmente pelo menu. O sistema não contempla vendas, geração de lucro ou reposição automática do orçamento. Da mesma forma, os tempos de produção são representados apenas por valores acumulados de tempo simulado, sem pausas reais durante a execução do programa.
+
+6. Organização orientada a objetos
+
+As classes abstratas Produto e Maquina concentram características e comportamentos comuns às suas respectivas hierarquias. As subclasses utilizam super() para aproveitar a implementação das classes superiores e sobrescrevem os métodos necessários para representar seus comportamentos específicos.
+
+O gerenciador de produção percorre uma coleção de objetos do tipo Maquina e realiza chamadas ao método processar(Produto). Dessa maneira, cada equipamento executa seu próprio comportamento por meio de polimorfismo, sem que o gerenciador precise identificar explicitamente o tipo de cada máquina.
+
+O processamento específico de cada produto também define uma configuração de circuito:
+
+STM32G: perfil de controle básico de sensores e atuadores.
+STM32F: perfil de controle e processamento de sinais.
+STM32H: perfil de processamento de maior complexidade.
+
+O atributo configuracaoCircuito é inicialmente definido como "Não configurado" e recebe seu valor durante o processamento da unidade pela implementação específica da subclasse.
+
+A máquina de fotolitografia chama o método processar() do produto sem selecionar seu perfil por meio de estruturas condicionais. Dessa forma, é o próprio objeto que determina sua configuração de acordo com sua classe concreta. Posteriormente, o armazém exibe a configuração armazenada.
+
+Esses perfis também são fictícios e foram definidos apenas para representar o resultado do processamento dentro do modelo. Eles não representam a execução real de algoritmos de controle pelo microcontrolador durante seu processo de fabricação.
+
+Utilizamos ArrayList para armazenar demandas, máquinas, produtos no armazém e elementos da fila da esteira. Os atributos mutáveis são privados, e as coleções internas não são expostas diretamente.
+
+As constantes relacionadas ao consumo de recursos foram mantidas nas subclasses dos microcontroladores, permitindo consultar essas informações sem que seja necessário criar objetos apenas para utilizá-los como catálogo.
+
+O contador estático presente em Produto registra todas as instâncias criadas, inclusive aquelas que posteriormente são rejeitadas durante a inspeção.
+
+Também utilizamos métodos privados para separar cálculos, validações e operações internas. A divisão das principais responsabilidades ficou definida da seguinte forma:
+
+Main: apresenta o menu e realiza a leitura das entradas.
+GerenciadorProducao: coordena o funcionamento geral da fábrica.
+Demanda: registra e acompanha as quantidades pendentes.
+MateriaPrima: controla o estoque de material.
+Esteira: realiza o transporte dos produtos.
+Subclasses de Maquina: executam as diferentes etapas do processo produtivo.
+
+7. Verificação e limitações
+
+O programa completo foi compilado e submetido a testes.
+
+Os testes mantidos no projeto verificam aspectos como reposição de unidades rejeitadas, custos de produção, controle de estoque, atendimento parcial de demandas, retomada da produção, validação de entradas e funcionamento das opções disponíveis no menu.

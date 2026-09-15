@@ -1,49 +1,72 @@
-public class Maquina {
-    
-    // Atributos
-    private String nome;
+import java.util.Random;
+
+// Define o funcionamento comum das máquinas da linha.
+public abstract class Maquina {
+    // Guarda os dados operacionais e o gerador de falhas.
+    private final String nome;
     private boolean ligada;
-    private double capacidadeMaxima;
+    private final int capacidadeMaxima;
+    private final double probabilidadeFalha;
+    private final double custoOperacao;
+    private final Random random = new Random();
 
-    // Construtor
-    public Maquina(String nome, double capacidadeMaxima) {
+    // Cria uma máquina com capacidade, risco e custo definidos.
+    public Maquina(String nome, int capacidadeMaxima, double probabilidadeFalha, double custoOperacao) {
+        if (nome == null || nome.trim().isEmpty()) {
+            throw new IllegalArgumentException("O nome da máquina deve ser informado.");
+        }
+        if (capacidadeMaxima <= 0) {
+            throw new IllegalArgumentException("A capacidade deve ser positiva.");
+        }
+        validarProbabilidade(probabilidadeFalha);
+        if (!Double.isFinite(custoOperacao) || custoOperacao < 0.0) {
+            throw new IllegalArgumentException("O custo deve ser finito e não negativo.");
+        }
         this.nome = nome;
-        this.capacidadeMaxima = capacidadeMaxima;
-        this.ligada = false; // Toda máquina nasce desligada por segurança
-    }
-
-    // Métodos
-    public void ligar(){
-        this.ligada = true;
-    }
-
-    public void desligar(){
         this.ligada = false;
+        this.capacidadeMaxima = capacidadeMaxima;
+        this.probabilidadeFalha = probabilidadeFalha;
+        this.custoOperacao = custoOperacao;
     }
 
-    public void processar( MateriaPrima materiaPrima, double demanda) {
-        if (!this.ligada){
-            System.out.println("[ERRO] A máquina " + this.nome + " está desligada.");
-            return;
-        } 
-        if ( demanda > this.capacidadeMaxima){
-            System.out.println("[ERRO] Sobrecarga! A demanda (" + demanda + ") excede a capacidade máxima (" + this.capacidadeMaxima + ") da máquina.");
-            return;
+    // Deixa cada máquina definir sua etapa de produção.
+    public abstract void processar(Produto p);
+    public abstract String getTipo();
+
+    // Controla a energia e expõe os dados operacionais.
+    public void ligar() { this.ligada = true; }
+    public void desligar() { this.ligada = false; }
+    public boolean estaLigada() { return ligada; }
+    public String getNome() { return nome; }
+    public int getCapacidadeMaxima() { return capacidadeMaxima; }
+    public double getProbabilidadeFalha() { return probabilidadeFalha; }
+    public double getCustoOperacao() { return custoOperacao; }
+
+    // Sorteia um evento usando a chance recebida.
+    protected boolean verificarFalha(double chanceFalha) {
+        validarProbabilidade(chanceFalha);
+        double sorteio = random.nextDouble();
+        return sorteio < chanceFalha;
+    }
+
+    // Confere se a máquina pode receber o produto.
+    protected void validarProcessamento(Produto produto, String statusEsperado) {
+        if (!ligada) {
+            throw new IllegalStateException("A máquina " + nome + " está desligada.");
         }
-        if (materiaPrima.verificarDisponibilidade(demanda)) {
-            materiaPrima.consumir(demanda);
-            System.out.println("[OK] Processamento concluído. Foram consumidos " + demanda + " de " + materiaPrima.getNome() + ".");
-        } else {
-            System.out.println("[ERRO] Estoque insuficiente de " + materiaPrima.getNome() + " para iniciar o processamento.");
+        if (produto == null) {
+            throw new IllegalArgumentException("O produto deve ser informado.");
+        }
+        if (!statusEsperado.equals(produto.getStatus())) {
+            throw new IllegalStateException("A máquina " + nome
+                    + " exige um produto no estado " + statusEsperado + ".");
         }
     }
 
-    // Métodos de acesso (getters)
-    public String getNome() {
-        return this.nome;
-    }
-    public boolean estaLigada() {
-        return this.ligada;
+    // Mantém qualquer probabilidade dentro do intervalo válido.
+    private void validarProbabilidade(double probabilidade) {
+        if (!Double.isFinite(probabilidade) || probabilidade < 0.0 || probabilidade > 1.0) {
+            throw new IllegalArgumentException("A probabilidade deve estar entre 0.0 e 1.0.");
+        }
     }
 }
-

@@ -1,36 +1,41 @@
-public class EstacaoInspecao {
-    
-    // Atributos
-    private boolean ativa;
+// Decide se cada unidade segue para o armazém.
+public class EstacaoInspecao extends Maquina {
+
+    // Registra quantas unidades passaram pela inspeção.
     private int produtosInspecionados;
 
-    // Construtor
+    // Configura o custo e a chance de falha da estação.
     public EstacaoInspecao() {
-        this.ativa = false; // A estação nasce desativada por padrão
-        this.produtosInspecionados = 0; // O contador de produtos começa zerado
+        super("Estação de Inspeção", 1, 0.05, 3.0);
+        this.produtosInspecionados = 0;
     }
 
-    // Métodos
-    public void ativar() {
-        this.ativa = true;
-    }
-
-    public void desativar() {
-        this.ativa = false;
-    }
-
-    public void inspecionar(Produto produto) {
-
-        if (!this.ativa) {
-            System.out.println("[ERRO] A estação de inspeção está desativada. Não é possível realizar a inspeção.");
-            return;
+    // Avalia o produto e aplica uma possível falha de detecção.
+    @Override
+    public void processar(Produto produto) {
+        validarProcessamento(produto, "Encapsulado");
+        boolean rejeitado = verificarFalha(calcularChanceRejeicao(produto));
+        boolean falhaInspecao = verificarFalha(getProbabilidadeFalha());
+        if (falhaInspecao) {
+            rejeitado = false;
         }
-
-        this.produtosInspecionados++;
-        System.out.println("[OK] Produto " + produto.getNome() + " inspecionado e aprovado.");
+        produto.setStatus(rejeitado ? "Rejeitado" : "Aprovado");
+        produtosInspecionados++;
     }
 
-    // Métodos de acesso (getters)
+    // Combina qualidade e risco na chance de rejeição.
+    private double calcularChanceRejeicao(Produto produto) {
+        return Math.min(1.0, produto.getQualidade()
+                * (0.10 + produto.getProbabilidadeFalhaAcumulada()));
+    }
+
+    // Identifica esta etapa da linha.
+    @Override
+    public String getTipo() {
+        return "Inspeção";
+    }
+
+    // Informa o total já inspecionado.
     public int getTotalInspecionados() {
         return this.produtosInspecionados;
     }

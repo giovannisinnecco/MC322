@@ -1,63 +1,70 @@
+import java.util.ArrayList;
+
+// Transporta os produtos pela linha em ordem de chegada.
 public class Esteira {
-    
-    // Atributos
-    private Object item;
+
+    // Guarda a fila e o estado atual da esteira.
+    private final ArrayList<Produto> produtos = new ArrayList<>();
     private boolean emMovimento;
-    private double capacidadeMaxima;
+    private final int capacidadeMaxima;
 
-    // Construtor
-    public Esteira(double capacidadeMaxima) {
+    // Cria uma esteira para uma unidade por vez.
+    public Esteira() {
+        this(1);
+    }
+
+    // Cria uma esteira com a capacidade escolhida.
+    public Esteira(int capacidadeMaxima) {
+        if (capacidadeMaxima <= 0) {
+            throw new IllegalArgumentException("A capacidade da esteira deve ser positiva.");
+        }
         this.capacidadeMaxima = capacidadeMaxima;
-        this.emMovimento = false; 
-        this.item = null;
-    }
-
-    // Métodos
-     public void ligar(){
-        this.emMovimento = true;
-    }
-
-    public void desligar(){
         this.emMovimento = false;
     }
 
-    public boolean verificarCapacidade(double carga){
-        return carga <= this.capacidadeMaxima;
+    // Controla o movimento e expõe o estado da fila.
+    public void ligar() { emMovimento = true; }
+    public void desligar() { emMovimento = false; }
+    public boolean estaEmMovimento() { return emMovimento; }
+    public int getCapacidadeMaxima() { return capacidadeMaxima; }
+    public int getQuantidadeProdutos() { return produtos.size(); }
+
+    // Confere se ainda há espaço na fila.
+    public boolean verificarCapacidade(int quantidadeAdicional) {
+        if (quantidadeAdicional < 0) {
+            throw new IllegalArgumentException("A quantidade adicional não pode ser negativa.");
+        }
+        return quantidadeAdicional <= capacidadeMaxima - produtos.size();
     }
 
-    public void adicionarItem (Object novoItem, double carga){
-        
-        if (!this.emMovimento) {
-            System.out.println("[ERRO] A esteira está desligada. Ligue o equipamento antes de carregar o material.");
-            return;
+    // Coloca um produto no fim da fila.
+    public void adicionarItem(Produto produto) {
+        verificarMovimento();
+        if (produto == null) {
+            throw new IllegalArgumentException("O produto deve ser informado.");
         }
-        if (this.item != null) {
-            System.out.println("[ERRO] A esteira já possui um item.");
-            return;
+        if (produtos.contains(produto)) {
+            throw new IllegalStateException("Esse produto já está na esteira.");
         }
-        if (!verificarCapacidade(carga)) {
-            System.out.println("[ERRO] A carga (" + carga + ") excede a capacidade máxima (" + this.capacidadeMaxima + ") da esteira.");
-            return;
+        if (!verificarCapacidade(1)) {
+            throw new IllegalStateException("A esteira está cheia.");
         }
-
-        this.item = novoItem;
-        System.out.println("[OK] Item adicionado à esteira.");
+        produtos.add(produto);
     }
 
-    public Object removerItem() {
-
-        if (!this.emMovimento) {
-            System.out.println("[ERRO] A esteira está parada. O item não foi transportado até o fim da linha.");
-            return null;
+    // Retira o produto que está há mais tempo na fila.
+    public Produto removerItem() {
+        verificarMovimento();
+        if (produtos.isEmpty()) {
+            throw new IllegalStateException("A esteira está vazia.");
         }
-        if (this.item == null) {
-            System.out.println("[AVISO] A esteira já está vazia.");
-            return null;
-        }
+        return produtos.remove(0);
+    }
 
-        Object itemRetirado = this.item; 
-        this.item = null; 
-        return itemRetirado;
+    // Impede operações enquanto a esteira está parada.
+    private void verificarMovimento() {
+        if (!emMovimento) {
+            throw new IllegalStateException("A esteira está desligada.");
+        }
     }
 }
-
