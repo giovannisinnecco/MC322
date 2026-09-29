@@ -5,7 +5,7 @@ Giovanni Innecco (RA 282589) e Rodrigo Soares (RA 197361)
 
 Mantemos a fábrica de microcontroladores STM32, ligada à nossa formação em Controle e Automação e ao contato com sensores, atuadores, ECU e telemetria. STM32G, STM32F e STM32H representam níveis de complexidade de circuito. Fotolitografia, encapsulamento e inspeção formam a linha, transportada pela Esteira. Todos os números são didáticos, sem pretensão de reproduzir especificações comerciais.
 
-A tarefa 3 acrescenta decisões de programação da produção, estados tipados, auditoria transversal, cenários e desgaste. A fabricação manual, a compra de silício, o controle de orçamento e a separação entre insumos e produtos acabados continuam disponíveis. A API de status de Produto passa intencionalmente de String para StatusProduto para eliminar estados digitados incorretamente. Os construtores antigos do gerenciador permanecem disponíveis para uso manual e testes com máquinas injetadas.
+A tarefa 3 acrescenta decisões de programação da produção, estados tipados, auditoria transversal, cenários e desgaste. A fabricação manual, a compra de silício, o controle de orçamento e a separação entre insumos e produtos acabados continuam disponíveis. A API de status de Produto passa intencionalmente de String para StatusProduto para eliminar estados digitados incorretamente. Os construtores antigos do gerenciador permanecem disponíveis para uso manual com máquinas recebidas pelo construtor.
 
 2. Padrão Strategy aplicado à programação de lotes
 
@@ -52,7 +52,7 @@ O console usa o tema SILICON FAB e agrupa demandas, fabricação e consultas em 
 
 Atributos são privados e consultas de listas não permitem alterar sua estrutura. Métodos validam quantidades e valores finitos. Não há concorrência de threads: os pedidos competem pela seleção e pelos recursos em uma linha sequencial. Não há persistência nem espera real. O orçamento é verificado antes de iniciar cada unidade, evitando ciclos iniciados sem dinheiro para todas as etapas.
 
-TesteTarefa3 verifica estratégias e empates, transições, cancelamento e reabertura, estimativas sem overflow, troca dinâmica, lotes, rejeições, custos, estoque, desgaste, saúde zero, auditoria, cenários e interação com o console. Testes críticos de produção injetam uma estação de resultado controlado; testes de cenários usam sementes. A compilação não requer bibliotecas externas. VERIFICACAO_TAREFA_3.md relaciona requisitos, implementação, testes e passos de entrega ainda externos ao projeto.
+A compilação não requer bibliotecas externas. Para compilar na raiz do projeto, use javac -encoding UTF-8 -d bin src/*.java. Para executar, use java -cp bin Main.
 
 8. Capacidade, abastecimento e estoque mínimo
 
@@ -67,9 +67,3 @@ retirarPorcao debita o estoque uma única vez e cria o registro do insumo separa
 Uma próxima evolução da Silicon Fab pode incluir programação e testes elétricos dos microcontroladores após o encapsulamento. Isso permitiria simular gravação de firmware e testes de comunicação com sensores, mantendo a conexão com aplicações de Controle e Automação.
 
 Outra expansão possível é planejar manutenção preventiva a partir da saúde e do histórico das máquinas, com custos e tempo de parada. A rastreabilidade atual também permite evoluir para múltiplos lotes de silício e fornecedores, associando defeitos detectados à origem do material. Essas possibilidades são propostas para as próximas etapas, não funcionalidades já implementadas.
-
-10. Revisão da tarefa 3 em 28/09/2026
-
-A ordem FIFO foi ajustada para preservar a posição de pedidos ainda pendentes ao editar quantidades. Somente pedidos reabertos entram no fim. A partida das máquinas agora está dentro do bloco de desligamento garantido: se alguma falhar ao ligar, todas são desligadas e o pedido volta a pendente, sem consumir recursos. Cenário ausente é rejeitado com uma mensagem de validação.
-
-Os comentários do código foram reduzidos a uma linha por comentário, com foco nas regras que não ficam óbvias pelo nome dos métodos. A suíte da tarefa 3 passou em 87 verificações; a dos requisitos herdados, em 57.
