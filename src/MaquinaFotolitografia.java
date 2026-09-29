@@ -1,22 +1,25 @@
-// Forma o circuito e pode acrescentar risco ao produto.
+// Forma o circuito e pode deixar defeitos no chip.
 public class MaquinaFotolitografia extends Maquina {
 
-    // Configura os parâmetros da etapa de fotolitografia.
     public MaquinaFotolitografia() {
-        super("Máquina de Fotolitografia", 1, 0.20, 10.0);
+        this(10);
     }
 
-    // Processa o circuito e sorteia um possível aumento de risco.
+    // A capacidade usa unidades de silício.
+    public MaquinaFotolitografia(int capacidade) {
+        super("Máquina de Fotolitografia", capacidade, 0.20, 10.0);
+    }
+
     @Override
     public void processar(Produto produto) {
-        validarProcessamento(produto, "Aguardando");
+        validarProcessamento(produto, StatusProduto.AGUARDANDO);
         produto.processar();
         if (verificarFalha(getProbabilidadeFalha())) {
             produto.aumentarProbabilidadeFalha(0.10);
         }
+        registrarUso();
     }
 
-    // Identifica esta etapa da linha.
     @Override
     public String getTipo() {
         return "Fotolitografia";

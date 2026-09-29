@@ -1,18 +1,17 @@
-// Reúne os dados e comportamentos comuns a qualquer microcontrolador.
-public abstract class Produto {
-    // Guarda a identidade, o estado e as características da unidade.
+public abstract class Produto implements Auditavel {
     private final int id;
     private final String nome;
-    private String status;
+    private StatusProduto status;
+    private int lote;
+    private PorcaoMateriaPrima origem;
     private String configuracaoCircuito;
     private final int quantidadeMateriaPrimaPorUnidade;
     private final double qualidade;
     private double probabilidadeFalhaAcumulada;
 
-    // Conta todas as unidades criadas pela fábrica.
+    // Conta também os chips que acabam rejeitados.
     private static int totalProdutosFabricados = 0;
 
-    // Cria uma unidade com seus parâmetros de fabricação.
     public Produto(String nome, int quantidadeMateriaPrimaPorUnidade, double qualidade) {
         if (nome == null || nome.trim().isEmpty()) {
             throw new IllegalArgumentException("O nome do produto deve ser informado.");
@@ -25,25 +24,22 @@ public abstract class Produto {
         }
         this.id = ++totalProdutosFabricados;
         this.nome = nome;
-        this.status = "Aguardando";
+        this.status = StatusProduto.AGUARDANDO;
         this.configuracaoCircuito = "Não configurado";
         this.quantidadeMateriaPrimaPorUnidade = quantidadeMateriaPrimaPorUnidade;
         this.qualidade = qualidade;
         this.probabilidadeFalhaAcumulada = 0.0;
     }
 
-    // Deixa cada modelo definir seu processamento, tempo e tipo.
     public abstract void processar();
     public abstract int calcularTempoProducao();
     public abstract String getTipo();
 
-    // Libera a leitura dos dados sem expor os atributos.
     public int getId() { return id; }
     public String getNome() { return nome; }
-    public String getStatus() { return status; }
+    public StatusProduto getStatus() { return status; }
     public String getConfiguracaoCircuito() { return configuracaoCircuito; }
 
-    // Permite que cada modelo grave sua configuração de circuito.
     protected void configurarCircuito(String configuracaoCircuito) {
         if (configuracaoCircuito == null || configuracaoCircuito.trim().isEmpty()) {
             throw new IllegalArgumentException("A configuração do circuito deve ser informada.");
@@ -51,9 +47,8 @@ public abstract class Produto {
         this.configuracaoCircuito = configuracaoCircuito;
     }
 
-    // Atualiza o estado conforme o produto avança na linha.
-    public void setStatus(String status) {
-        if (status == null || status.trim().isEmpty()) {
+    public void setStatus(StatusProduto status) {
+        if (status == null) {
             throw new IllegalArgumentException("O estado do produto deve ser informado.");
         }
         this.status = status;
@@ -61,7 +56,6 @@ public abstract class Produto {
     public int getQuantidadeMateriaPrimaPorUnidade() { return quantidadeMateriaPrimaPorUnidade; }
     public double getQualidade() { return qualidade; }
 
-    // Soma o risco adquirido durante a fabricação.
     public void aumentarProbabilidadeFalha(double incremento) {
         if (!Double.isFinite(incremento) || incremento < 0.0 || incremento > 1.0) {
             throw new IllegalArgumentException("O incremento deve estar entre 0.0 e 1.0.");
@@ -72,6 +66,27 @@ public abstract class Produto {
 
     public double getProbabilidadeFalhaAcumulada() { return probabilidadeFalhaAcumulada; }
 
-    // Informa quantas unidades já foram criadas.
     public static int getTotalProdutosFabricados() { return totalProdutosFabricados; }
+    public int getLote() { return lote; }
+    public void setLote(int lote) {
+        if (lote <= 0 || this.lote != 0) throw new IllegalArgumentException("Lote inválido ou já atribuído.");
+        this.lote = lote;
+    }
+    public PorcaoMateriaPrima getOrigem() { return origem; }
+    public void registrarOrigem(PorcaoMateriaPrima porcao) {
+        if (porcao == null || porcao.getQuantidade() != quantidadeMateriaPrimaPorUnidade)
+            throw new IllegalArgumentException("Porção incompatível com o consumo do produto.");
+        if (origem != null || status != StatusProduto.AGUARDANDO)
+            throw new IllegalStateException("Origem já definida ou processamento iniciado.");
+        origem = porcao;
+    }
+    // Quanto maior a qualidade exigida, menor a tolerância ao risco.
+    @Override public boolean precisaManutencao() {
+        return status == StatusProduto.REJEITADO || qualidade * probabilidadeFalhaAcumulada >= 0.15;
+    }
+    @Override public String gerarRelatorioDiagnostico() {
+        return String.format("#%d %s | lote %d | %s | qualidade %.2f | risco %.2f%% | intervenção: %s",
+                id, nome, lote, status, qualidade, 100 * probabilidadeFalhaAcumulada, precisaManutencao())
+                + " | origem: " + (origem == null ? "não registrada" : origem.descrever());
+    }
 }

@@ -1,7 +1,5 @@
-// Controla o estoque e o preço do silício.
 public class MateriaPrima {
 
-    // Guarda a identificação e os valores atuais do estoque.
     private final int id;
     private final String nome;
     private double quantidade;
@@ -9,7 +7,6 @@ public class MateriaPrima {
     private final double quantidadeMinima;
     private final double custoPorUnidade;
 
-    // Cria a matéria-prima com estoque e preço iniciais.
     public MateriaPrima(int id, String nome, double quantidade, String unidade,
                         double quantidadeMinima, double custoPorUnidade) {
         if (id <= 0) {
@@ -31,22 +28,27 @@ public class MateriaPrima {
         this.custoPorUnidade = custoPorUnidade;
     }
 
-    // Confere se o estoque atende a próxima operação.
     public boolean verificarDisponibilidade(double quantidadeNecessaria) {
         validarQuantidadeNaoNegativa(quantidadeNecessaria);
-        return quantidade >= quantidadeNecessaria;
+        // O mínimo precisa existir antes de começar o ciclo.
+        return quantidade >= quantidadeNecessaria
+                && (quantidadeNecessaria == 0 || quantidade >= quantidadeMinima);
     }
 
-    // Retira material quando uma unidade começa a ser produzida.
     public void consumir(double quantidadeNecessaria) {
         validarQuantidadePositiva(quantidadeNecessaria);
         if (!verificarDisponibilidade(quantidadeNecessaria)) {
-            throw new IllegalStateException("Estoque insuficiente de " + nome + ".");
+            throw new IllegalStateException("Estoque insuficiente ou abaixo do mínimo de " + nome + ".");
         }
         quantidade -= quantidadeNecessaria;
     }
 
-    // Acrescenta ao estoque o material comprado.
+    // Separa o silício da tentativa sem perder sua origem.
+    public PorcaoMateriaPrima retirarPorcao(double quantidade) {
+        consumir(quantidade);
+        return new PorcaoMateriaPrima(id, nome, unidade, quantidade);
+    }
+
     public void adicionarEstoque(double quantidadeAdicional) {
         validarQuantidadePositiva(quantidadeAdicional);
         double novaQuantidade = quantidade + quantidadeAdicional;
@@ -54,14 +56,12 @@ public class MateriaPrima {
         quantidade = novaQuantidade;
     }
 
-    // Aceita apenas quantidades finitas e não negativas.
     private void validarQuantidadeNaoNegativa(double valor) {
         if (!Double.isFinite(valor) || valor < 0.0) {
             throw new IllegalArgumentException("A quantidade deve ser finita e não negativa.");
         }
     }
 
-    // Exige um valor positivo para movimentar o estoque.
     private void validarQuantidadePositiva(double valor) {
         validarQuantidadeNaoNegativa(valor);
         if (valor == 0.0) {
@@ -69,7 +69,6 @@ public class MateriaPrima {
         }
     }
 
-    // Libera a leitura dos dados do estoque.
     public int getId() { return id; }
     public String getNome() { return nome; }
     public double getQuantidade() { return quantidade; }

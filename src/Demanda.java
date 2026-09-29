@@ -1,53 +1,62 @@
-// Acompanha quantas unidades aprovadas ainda faltam.
+// As estimativas não contam tentativas rejeitadas.
 public class Demanda {
-
-    // Guarda o modelo pedido e sua quantidade pendente.
     private final String tipoProduto;
+    private final int consumoPorUnidade;
+    private final double custoPorUnidade;
     private int quantidadeProdutos;
-    private boolean atendida;
-
-    // Cria uma demanda para um modelo da fábrica.
-    public Demanda(String tipoProduto, int quantidadeProdutos) {
-        if (tipoProduto == null || tipoProduto.trim().isEmpty()) {
-            throw new IllegalArgumentException("O tipo do produto deve ser informado.");
-        }
-        this.tipoProduto = tipoProduto.trim();
-        definirQuantidade(quantidadeProdutos);
+    private StatusDemanda status;
+    public Demanda(String tipoProduto, int quantidade) {
+        this(tipoProduto, quantidade, consumo(tipoProduto), 18.0);
     }
-
-    // Troca a quantidade pendente pelo novo valor.
-    public void atualizarQuantidade(int novaQuantidade) {
-        definirQuantidade(novaQuantidade);
+    public Demanda(String tipoProduto, int quantidade, int consumo, double custo) {
+        if (tipoProduto == null || tipoProduto.trim().isEmpty() || consumo <= 0
+                || !Double.isFinite(custo) || custo <= 0) throw new IllegalArgumentException("Demanda inválida.");
+        this.tipoProduto = tipoProduto; this.consumoPorUnidade = consumo; this.custoPorUnidade = custo;
+        definirQuantidade(quantidade);
     }
-
-    // Valida a quantidade e atualiza o estado da demanda.
-    private void definirQuantidade(int novaQuantidade) {
-        if (novaQuantidade < 0) {
-            throw new IllegalArgumentException("A quantidade pendente não pode ser negativa.");
-        }
-        quantidadeProdutos = novaQuantidade;
-        atendida = quantidadeProdutos == 0;
+    private static int consumo(String tipo) {
+        if ("STM32G".equals(tipo)) return STM32G.CONSUMO_MATERIA_PRIMA;
+        if ("STM32F".equals(tipo)) return STM32F.CONSUMO_MATERIA_PRIMA;
+        if ("STM32H".equals(tipo)) return STM32H.CONSUMO_MATERIA_PRIMA;
+        throw new IllegalArgumentException("Modelo desconhecido.");
     }
-
-    // Calcula o material mínimo sem prever rejeições.
-    public double calcularMateriaPrimaNecessaria(int quantidadeMateriaPrimaPorUnidade) {
-        if (quantidadeMateriaPrimaPorUnidade <= 0) {
-            throw new IllegalArgumentException("O consumo por unidade deve ser positivo.");
-        }
-        return (double) quantidadeProdutos * quantidadeMateriaPrimaPorUnidade;
+    // Atualizar permite reabrir um pedido cancelado.
+    public void atualizarQuantidade(int quantidade) {
+        if (quantidade < 0) throw new IllegalArgumentException("Quantidade negativa.");
+        if (status == StatusDemanda.EM_PRODUCAO) throw new IllegalStateException("Demanda em produção.");
+        definirQuantidade(quantidade);
     }
-
-    // Registra uma unidade aprovada no pedido.
+    private void definirQuantidade(int quantidade) {
+        if (quantidade < 0) throw new IllegalArgumentException("Quantidade negativa.");
+        quantidadeProdutos = quantidade;
+        status = quantidade == 0 ? StatusDemanda.CONCLUIDA : StatusDemanda.PENDENTE;
+    }
+    public void iniciar() {
+        if (status != StatusDemanda.PENDENTE) throw new IllegalStateException("Demanda não está pendente.");
+        status = StatusDemanda.EM_PRODUCAO;
+    }
+    public void cancelar() {
+        if (status != StatusDemanda.PENDENTE && status != StatusDemanda.EM_PRODUCAO)
+            throw new IllegalStateException("Demanda já encerrada.");
+        status = StatusDemanda.CANCELADA;
+    }
+    public void pausar() {
+        if (status != StatusDemanda.EM_PRODUCAO) throw new IllegalStateException("Demanda não iniciada.");
+        status = StatusDemanda.PENDENTE;
+    }
     public void atender() {
-        if (atendida) {
-            throw new IllegalStateException("Esta demanda não possui unidades pendentes.");
-        }
-        quantidadeProdutos--;
-        atendida = quantidadeProdutos == 0;
+        if (status != StatusDemanda.EM_PRODUCAO) throw new IllegalStateException("Demanda não está em produção.");
+        if (--quantidadeProdutos == 0) status = StatusDemanda.CONCLUIDA;
     }
-
-    // Libera a leitura do estado da demanda.
+    public double calcularMateriaPrimaNecessaria(int consumo) {
+        if (consumo <= 0) throw new IllegalArgumentException("Consumo inválido.");
+        return (double) quantidadeProdutos * consumo;
+    }
+    public double calcularConsumoEstimado() { return calcularMateriaPrimaNecessaria(consumoPorUnidade); }
+    public double calcularCustoEstimado() { return quantidadeProdutos * custoPorUnidade; }
+    public boolean ehViavel(double budget) { return Double.isFinite(budget) && budget >= calcularCustoEstimado(); }
     public String getTipoProduto() { return tipoProduto; }
     public int getQuantidadeProdutos() { return quantidadeProdutos; }
-    public boolean estaAtendida() { return atendida; }
+    public StatusDemanda getStatus() { return status; }
+    public boolean estaAtendida() { return status == StatusDemanda.CONCLUIDA; }
 }

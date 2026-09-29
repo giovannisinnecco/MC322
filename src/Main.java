@@ -2,33 +2,28 @@ import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.Scanner;
 
-// Inicia a fábrica e cuida da conversa com o usuário.
 public class Main {
 
-    // Mantém a ordem dos modelos usada pelo menu.
     private static final String[] TIPOS_PRODUTO = {"STM32G", "STM32F", "STM32H"};
 
-    // Monta o turno e mantém o sistema aberto até a saída.
     public static void main(String[] args) {
         Locale.setDefault(Locale.forLanguageTag("pt-BR"));
-        MateriaPrima silicio = new MateriaPrima(1, "Silício", 100.0,
-                "unidades de material", 10.0, 2.0);
-        GerenciadorProducao gerenciador = new GerenciadorProducao(silicio, 1000.0);
-        for (String tipo : TIPOS_PRODUTO) {
-            gerenciador.registrarDemanda(tipo, 0);
-        }
-
         exibirIntroducao();
         try (Scanner scanner = new Scanner(System.in)) {
+            System.out.println("CENÁRIO: 1 - Ideal | 2 - Apocalíptico | 0 - Sair");
+            int escolha = lerInteiro(scanner, "Escolha: ", 0, 2);
+            if (escolha == 0) return;
+            Cenario cenario = escolha == 1 ? Cenario.IDEAL : Cenario.APOCALIPTICO;
+            GerenciadorProducao gerenciador = new GerenciadorProducao(cenario, new EstrategiaFilaSilicio());
+            for (String tipo : TIPOS_PRODUTO) gerenciador.registrarDemanda(tipo, 0);
             executarMenu(scanner, gerenciador);
+            exibirResumo(gerenciador);
         } catch (NoSuchElementException erro) {
             System.out.println("\n[SISTEMA] Entrada encerrada. Finalizando o turno.");
         }
-        exibirResumo(gerenciador);
         System.out.println("[SISTEMA] Turno encerrado. Até logo!");
     }
 
-    // Apresenta o tema e as regras básicas da simulação.
     private static void exibirIntroducao() {
         System.out.println("=======================================================");
         System.out.println("          SILICON FAB - MICROCONTROLADORES STM32");
@@ -43,77 +38,78 @@ public class Main {
         System.out.println("=======================================================");
     }
 
-    // Recebe as escolhas e encaminha cada ação ao gerenciador.
-    private static void executarMenu(Scanner scanner, GerenciadorProducao gerenciador) {
+    private static void executarMenu(Scanner scanner, GerenciadorProducao g) {
         while (true) {
-            exibirMenu(gerenciador);
-            int opcao = lerInteiro(scanner, "Escolha uma opção (0-10): ", 0, 10);
-            if (opcao == 0) {
-                return;
-            }
+            System.out.println("\n================ SILICON FAB ================");
+            System.out.println("Cenário: " + g.getCenario().getNome());
+            System.out.println("Estratégia atual: " + g.getNomeEstrategia());
+            g.exibirBudget();
+            System.out.println("1 - Demandas\n2 - Fabricação\n3 - Consultas\n4 - Comprar silício"
+                    + "\n5 - Trocar estratégia\n6 - Auditoria\n0 - Sair");
+            int opcao = lerInteiro(scanner, "Escolha: ", 0, 6);
+            if (opcao == 0) return;
             try {
-                if (opcao >= 1 && opcao <= 3) {
-                    String tipo = TIPOS_PRODUTO[opcao - 1];
-                    System.out.println("Atualizar " + tipo + ": substitui a pendência atual.");
-                    int quantidade = lerInteiro(scanner,
-                            "Informe a nova quantidade pendente (0 para encerrar a pendência): ",
-                            0, Integer.MAX_VALUE);
-                    gerenciador.atualizarDemanda(tipo, quantidade);
-                    System.out.println("[OK] Demanda atualizada: " + quantidade + " unidades pendentes.");
-                } else if (opcao >= 4 && opcao <= 6) {
-                    gerenciador.fabricarDemanda(TIPOS_PRODUTO[opcao - 4]);
-                } else {
-                    switch (opcao) {
-                        case 7:
-                            gerenciador.exibirArmazem();
-                            break;
-                        case 8:
-                            gerenciador.exibirEstoque();
-                            break;
-                        case 9:
-                            gerenciador.exibirEstoque();
-                            double quantidade = lerQuantidadeCompra(scanner);
-                            gerenciador.comprarMateriaPrima(quantidade);
-                            System.out.println("[OK] Compra realizada: " + quantidade + " unidades de material.");
-                            gerenciador.exibirBudget();
-                            break;
-                        case 10:
-                            exibirResumo(gerenciador);
-                            break;
-                        default:
-                            throw new IllegalArgumentException("Opção inválida.");
-                    }
+                switch (opcao) {
+                    case 1: menuDemandas(scanner, g); break;
+                    case 2: menuFabricacao(scanner, g); break;
+                    case 3: menuConsultas(scanner, g); break;
+                    case 4:
+                        g.comprarMateriaPrima(lerQuantidadeCompra(scanner));
+                        System.out.println("[OK] Silício recebido no estoque."); break;
+                    case 5: menuEstrategias(scanner, g); break;
+                    case 6: g.gerarAuditoriaGeral(); break;
+                    default: break;
                 }
             } catch (IllegalArgumentException | IllegalStateException erro) {
                 System.out.println("[ERRO] " + erro.getMessage());
             }
         }
     }
-
-    // Mostra as opções e o estado atual das demandas.
-    private static void exibirMenu(GerenciadorProducao gerenciador) {
-        System.out.println("\n================ MENU DA SILICON FAB =================");
-        gerenciador.exibirBudget();
-        System.out.println("\nATUALIZAR DEMANDAS");
-        for (int i = 0; i < TIPOS_PRODUTO.length; i++) {
-            String tipo = TIPOS_PRODUTO[i];
-            System.out.println((i + 1) + " - Atualizar " + tipo
-                    + " (pendentes: " + gerenciador.getQuantidadePendente(tipo) + ")");
+    private static void menuDemandas(Scanner scanner, GerenciadorProducao g) {
+        while (true) {
+            System.out.println("\n--- DEMANDAS ---\n1 - Atualizar STM32G\n2 - Atualizar STM32F"
+                    + "\n3 - Atualizar STM32H\n4 - Listar demandas\n0 - Voltar");
+            int opcao = lerInteiro(scanner, "Escolha: ", 0, 4);
+            if (opcao == 0) return;
+            if (opcao == 4) g.exibirDemandas();
+            else {
+                int quantidade = lerInteiro(scanner, "Nova pendência (0 encerra; atualização reabre pedido cancelado): ",
+                        0, Integer.MAX_VALUE);
+                g.atualizarDemanda(TIPOS_PRODUTO[opcao - 1], quantidade);
+            }
         }
-        System.out.println("\nFABRICAR");
-        for (int i = 0; i < TIPOS_PRODUTO.length; i++) {
-            System.out.println((i + 4) + " - Fabricar " + TIPOS_PRODUTO[i]);
+    }
+    private static void menuFabricacao(Scanner scanner, GerenciadorProducao g) {
+        while (true) {
+            System.out.println("\n--- FABRICAÇÃO ---\nEstratégia: " + g.getNomeEstrategia());
+            System.out.println("1 - Próxima demanda pela estratégia\n2 - Fabricar STM32G"
+                    + "\n3 - Fabricar STM32F\n4 - Fabricar STM32H\n0 - Voltar");
+            int opcao = lerInteiro(scanner, "Escolha: ", 0, 4);
+            if (opcao == 0) return;
+            if (opcao == 1) g.executarProximaProducao();
+            else g.fabricarDemanda(TIPOS_PRODUTO[opcao - 2]);
         }
-        System.out.println("\nCONSULTAR");
-        System.out.println("7 - Ver armazém");
-        System.out.println("8 - Ver estoque de matéria-prima");
-        System.out.println("10 - Ver resumo do turno e demandas");
-        System.out.println("\nCOMPRAR MATÉRIA-PRIMA");
-        System.out.println("9 - Comprar silício");
-        System.out.println("\n0 - Sair");
+    }
+    private static void menuConsultas(Scanner scanner, GerenciadorProducao g) {
+        while (true) {
+            System.out.println("\n--- CONSULTAS ---\n1 - Armazém de chips acabados"
+                    + "\n2 - Estoque de silício bruto\n3 - Resumo do turno\n0 - Voltar");
+            int opcao = lerInteiro(scanner, "Escolha: ", 0, 3);
+            if (opcao == 0) return;
+            if (opcao == 1) g.exibirArmazem();
+            if (opcao == 2) g.exibirEstoque();
+            if (opcao == 3) exibirResumo(g);
+        }
+    }
+    private static void menuEstrategias(Scanner scanner, GerenciadorProducao g) {
+        System.out.println("\n--- ESTRATÉGIAS ---\n1 - Fila de silício (ordem de chegada)"
+                + "\n2 - Maior lote STM32\n3 - Rendimento de chips (maior lote inteiro viável)\n0 - Voltar");
+        int opcao = lerInteiro(scanner, "Escolha: ", 0, 3);
+        if (opcao == 1) g.setEstrategia(new EstrategiaFilaSilicio());
+        if (opcao == 2) g.setEstrategia(new EstrategiaMaiorLoteSTM32());
+        if (opcao == 3) g.setEstrategia(new EstrategiaRendimentoChips());
     }
 
-    // Lê um inteiro válido dentro do intervalo pedido.
     private static int lerInteiro(Scanner scanner, String mensagem, int minimo, int maximo) {
         while (true) {
             System.out.print(mensagem);
@@ -124,13 +120,12 @@ public class Main {
                     return valor;
                 }
             } catch (NumberFormatException erro) {
-                // A mensagem abaixo orienta uma nova tentativa.
+                // Pede outro número sem encerrar o programa.
             }
             System.out.println("[ERRO] Digite um número inteiro entre " + minimo + " e " + maximo + ".");
         }
     }
 
-    // Lê uma compra positiva com ponto ou vírgula decimal.
     private static double lerQuantidadeCompra(Scanner scanner) {
         while (true) {
             System.out.print("Quantidade de material a comprar (ex.: 5 ou 2,5; sem separador de milhar): ");
@@ -145,13 +140,12 @@ public class Main {
         }
     }
 
-    // Resume recursos, demandas e resultados do turno.
     private static void exibirResumo(GerenciadorProducao gerenciador) {
         System.out.println("\n================ RESUMO DO TURNO =====================");
         gerenciador.exibirBudget();
         gerenciador.exibirEstoque();
         gerenciador.exibirDemandas();
-        int totalCriado = Produto.getTotalProdutosFabricados();
+        int totalCriado = gerenciador.getTotalTentativas();
         int totalArmazenado = gerenciador.getTotalArmazenado();
         System.out.println("Microcontroladores produzidos (inclui rejeitados): " + totalCriado);
         System.out.println("Aprovados no armazém: " + totalArmazenado);

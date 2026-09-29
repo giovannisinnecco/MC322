@@ -1,24 +1,27 @@
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
-// Coordena todos os recursos e etapas da fábrica.
+// Cuida dos pedidos e dos recursos da fábrica.
 public class GerenciadorProducao {
 
-    // Guarda demandas, armazém, máquinas e recursos do turno.
     private final ArrayList<Demanda> demandas = new ArrayList<>();
     private final ArrayList<Produto> produtosFabricados = new ArrayList<>();
     private final ArrayList<Maquina> maquinas = new ArrayList<>();
     private final MateriaPrima materiaPrima;
     private final Esteira esteira = new Esteira();
     private double budget;
+    private EstrategiaProducao estrategiaAtual;
+    private Cenario cenario;
+    private int ultimoLote;
+    private final List<Produto> produtosTentados = new ArrayList<>();
     private long tempoTotalProducao;
 
-    // Cria o gerenciador com a linha padrão da fábrica.
     public GerenciadorProducao(MateriaPrima materiaPrima, double budget) {
         this(materiaPrima, budget, new MaquinaFotolitografia(),
                 new MaquinaEncapsulamento(), new EstacaoInspecao());
     }
 
-    // Monta a linha com máquinas recebidas na ordem correta.
     public GerenciadorProducao(MateriaPrima materiaPrima, double budget,
                               MaquinaFotolitografia fotolitografia,
                               MaquinaEncapsulamento encapsulamento,
@@ -37,7 +40,6 @@ public class GerenciadorProducao {
         maquinas.add(inspecao);
     }
 
-    // Cadastra uma demanda nova para um modelo conhecido.
     public void registrarDemanda(String tipoProduto, int quantidadeProdutos) {
         obterConsumoPorUnidade(tipoProduto);
         for (Demanda demanda : demandas) {
@@ -45,49 +47,87 @@ public class GerenciadorProducao {
                 throw new IllegalArgumentException("Já existe demanda para " + tipoProduto + ".");
             }
         }
-        demandas.add(new Demanda(tipoProduto, quantidadeProdutos));
+        demandas.add(new Demanda(tipoProduto, quantidadeProdutos,
+                obterConsumoPorUnidade(tipoProduto), calcularCustoProducao()));
     }
 
-    // Substitui a quantidade pendente de uma demanda.
     public void atualizarDemanda(String tipoProduto, int novaQuantidade) {
-        buscarDemanda(tipoProduto).atualizarQuantidade(novaQuantidade);
+        Demanda demanda = buscarDemanda(tipoProduto);
+        boolean reabrindo = demanda.getStatus() == StatusDemanda.CONCLUIDA
+                || demanda.getStatus() == StatusDemanda.CANCELADA;
+        demanda.atualizarQuantidade(novaQuantidade);
+        // Só pedidos reabertos entram no fim da fila.
+        if (reabrindo && novaQuantidade > 0) {
+            demandas.remove(demanda);
+            demandas.add(demanda);
+        }
     }
 
-    // Produz até atender o pedido ou acabar algum recurso.
     public void fabricarDemanda(String tipoProduto) {
         Demanda demanda = buscarDemanda(tipoProduto);
-        if (demanda.estaAtendida()) {
-            System.out.println("[AVISO] Não há unidades pendentes de " + tipoProduto + ".");
+        if (demanda.getStatus() != StatusDemanda.PENDENTE) {
+            System.out.println("[AVISO] Demanda não elegível; atualize o pedido de " + tipoProduto + ".");
             return;
         }
 
+        for (Maquina maquina : maquinas) {
+            if (maquina.getEstado() == EstadoMaquina.QUEBRADA) {
+                System.out.println("[AVISO] Linha parada: " + maquina.getNome() + " quebrada.");
+                return;
+            }
+        }
         int consumoPorUnidade = obterConsumoPorUnidade(tipoProduto);
+        if (!esteira.verificarCarga(consumoPorUnidade)) {
+            System.out.println("[AVISO] Carga excede a capacidade da esteira; pedido permanece pendente.");
+            return;
+        }
+        for (Maquina maquina : maquinas) {
+            if (!maquina.verificarCapacidade(consumoPorUnidade)) {
+                System.out.println("[AVISO] Carga excede a capacidade de " + maquina.getNome()
+                        + "; pedido permanece pendente.");
+                return;
+            }
+        }
+        demanda.iniciar();
+        int lote = ++ultimoLote;
         double custoCiclo = calcularCustoProducao();
         long tentativas = 0;
         int aprovados = 0;
         long tempoInicial = tempoTotalProducao;
 
-        // Liga toda a linha antes de iniciar as tentativas.
-        esteira.ligar();
-        for (Maquina maquina : maquinas) {
-            maquina.ligar();
-        }
         try {
-            // Repete o ciclo enquanto ainda faltarem unidades aprovadas.
-            while (!demanda.estaAtendida()) {
+            esteira.ligar();
+            for (Maquina maquina : maquinas) {
+                maquina.ligar();
+            }
+            while (demanda.getStatus() == StatusDemanda.EM_PRODUCAO) {
                 if (!materiaPrima.verificarDisponibilidade(consumoPorUnidade)) {
-                    System.out.println("[AVISO] Produção interrompida: matéria-prima insuficiente.");
+                    demanda.cancelar();
+                    System.out.println("[AVISO] Demanda cancelada: matéria-prima insuficiente ou estoque abaixo do mínimo.");
                     break;
                 }
                 if (budget < custoCiclo) {
-                    System.out.println("[AVISO] Produção interrompida: orçamento insuficiente para o ciclo completo.");
+                    demanda.cancelar();
+                    System.out.println("[AVISO] Demanda cancelada: orçamento insuficiente para o ciclo completo.");
                     break;
                 }
 
+                boolean quebrada = false;
+                for (Maquina maquina : maquinas) quebrada |= maquina.getEstado() == EstadoMaquina.QUEBRADA;
+                if (quebrada) {
+                    demanda.pausar();
+                    System.out.println("[AVISO] Linha parada por desgaste. Demanda volta a pendente.");
+                    break;
+                }
                 Produto produto = criarProduto(tipoProduto);
-                materiaPrima.consumir(consumoPorUnidade);
+                produto.setLote(lote);
+                if (cenario != null) produto.aumentarProbabilidadeFalha(cenario.getRiscoProduto());
+                produtosTentados.add(produto);
+                PorcaoMateriaPrima porcao = materiaPrima.retirarPorcao(consumoPorUnidade);
+                esteira.adicionarMateriaPrima(porcao);
+                produto.registrarOrigem(esteira.removerMateriaPrima());
+                System.out.println("[ESTEIRA] " + porcao.descrever() + " transportado para o chip #" + produto.getId());
                 tentativas++;
-                // Faz a unidade passar por cada máquina da linha.
                 for (Maquina maquina : maquinas) {
                     esteira.adicionarItem(produto);
                     Produto transportado = esteira.removerItem();
@@ -96,8 +136,8 @@ public class GerenciadorProducao {
                 }
                 tempoTotalProducao += produto.calcularTempoProducao();
 
-                // Só uma unidade aprovada atende a demanda.
-                if ("Aprovado".equals(produto.getStatus())) {
+                // Só chips aprovados reduzem a pendência.
+                if (produto.getStatus() == StatusProduto.APROVADO) {
                     produtosFabricados.add(produto);
                     demanda.atender();
                     aprovados++;
@@ -106,7 +146,8 @@ public class GerenciadorProducao {
                         + produto.getTipo() + ": " + produto.getStatus());
             }
         } finally {
-            // Sempre desliga a linha ao encerrar a execução.
+            // Mesmo com erro, a linha desliga e o pedido volta à fila.
+            if (demanda.getStatus() == StatusDemanda.EM_PRODUCAO) demanda.pausar();
             for (Maquina maquina : maquinas) {
                 maquina.desligar();
             }
@@ -123,7 +164,6 @@ public class GerenciadorProducao {
         }
     }
 
-    // Compra material sem ultrapassar o orçamento disponível.
     public void comprarMateriaPrima(double quantidade) {
         if (!Double.isFinite(quantidade) || quantidade <= 0.0) {
             throw new IllegalArgumentException("A quantidade de compra deve ser finita e positiva.");
@@ -139,12 +179,10 @@ public class GerenciadorProducao {
         budget -= custoCompra;
     }
 
-    // Mostra o dinheiro que ainda pode ser usado.
     public void exibirBudget() {
         System.out.printf("Orçamento disponível: R$ %.2f%n", budget);
     }
 
-    // Lista todas as unidades aprovadas no armazém.
     public void exibirArmazem() {
         System.out.println("=== ARMAZÉM ===");
         if (produtosFabricados.isEmpty()) {
@@ -154,39 +192,39 @@ public class GerenciadorProducao {
         for (Produto produto : produtosFabricados) {
             System.out.println("#" + produto.getId() + " — " + produto.getTipo()
                     + " — " + produto.getStatus());
+            System.out.println("  " + produto.gerarRelatorioDiagnostico());
             System.out.println("  Circuito: " + produto.getConfiguracaoCircuito());
+        }
+        for (String tipo : new String[] {"STM32G", "STM32F", "STM32H"}) {
+            System.out.println(tipo + " disponíveis: " + getQuantidadeArmazenada(tipo));
         }
         System.out.println("Total armazenado: " + produtosFabricados.size());
     }
 
-    // Mostra a quantidade e o preço do silício.
     public void exibirEstoque() {
         System.out.println(materiaPrima.getNome() + ": " + materiaPrima.getQuantidade()
                 + " " + materiaPrima.getUnidade());
+        System.out.println("Mínimo para iniciar um ciclo: " + materiaPrima.getQuantidadeMinima());
         System.out.printf("Preço de compra por unidade: R$ %.2f%n", materiaPrima.getCustoPorUnidade());
     }
 
-    // Mostra as pendências e o material mínimo de cada pedido.
     public void exibirDemandas() {
         for (Demanda demanda : demandas) {
             String tipo = demanda.getTipoProduto();
-            System.out.println(tipo + ": " + demanda.getQuantidadeProdutos()
+            System.out.println(tipo + " [" + demanda.getStatus().getDescricao() + "]: " + demanda.getQuantidadeProdutos()
                     + " pendentes | Material mínimo, sem rejeições: "
                     + demanda.calcularMateriaPrimaNecessaria(obterConsumoPorUnidade(tipo)));
         }
     }
 
-    // Libera os totais usados pelo menu e pelos testes.
     public double getBudget() { return budget; }
     public long getTempoTotalProducao() { return tempoTotalProducao; }
     public int getTotalArmazenado() { return produtosFabricados.size(); }
 
-    // Consulta a pendência de um modelo específico.
     public int getQuantidadePendente(String tipoProduto) {
         return buscarDemanda(tipoProduto).getQuantidadeProdutos();
     }
 
-    // Conta no armazém as unidades de um modelo.
     public int getQuantidadeArmazenada(String tipoProduto) {
         obterConsumoPorUnidade(tipoProduto);
         int quantidade = 0;
@@ -198,7 +236,6 @@ public class GerenciadorProducao {
         return quantidade;
     }
 
-    // Soma o custo de um ciclo completo da linha.
     private double calcularCustoProducao() {
         double custo = 0.0;
         for (Maquina maquina : maquinas) {
@@ -207,7 +244,6 @@ public class GerenciadorProducao {
         return custo;
     }
 
-    // Localiza a demanda cadastrada para o modelo.
     private Demanda buscarDemanda(String tipoProduto) {
         for (Demanda demanda : demandas) {
             if (demanda.getTipoProduto().equals(tipoProduto)) {
@@ -217,7 +253,6 @@ public class GerenciadorProducao {
         throw new IllegalArgumentException("Demanda não registrada para esse tipo de produto.");
     }
 
-    // Retorna o consumo sem criar uma unidade de produto.
     private int obterConsumoPorUnidade(String tipoProduto) {
         if (tipoProduto == null) {
             throw new IllegalArgumentException("O tipo do produto deve ser informado.");
@@ -230,7 +265,6 @@ public class GerenciadorProducao {
         }
     }
 
-    // Cria o objeto correto para o modelo solicitado.
     private Produto criarProduto(String tipoProduto) {
         switch (tipoProduto) {
             case "STM32G": return new STM32G();
@@ -238,5 +272,55 @@ public class GerenciadorProducao {
             case "STM32H": return new STM32H();
             default: throw new IllegalArgumentException("Tipo de produto desconhecido: " + tipoProduto);
         }
+    }
+    public GerenciadorProducao(Cenario cenario, EstrategiaProducao estrategia) {
+        this(criarEstoque(cenario), cenario.getBudget());
+        this.cenario = cenario;
+        if (estrategia == null) throw new IllegalArgumentException("Informe uma estratégia.");
+        this.estrategiaAtual = estrategia;
+        for (Maquina maquina : maquinas) maquina.configurarCenario(cenario);
+    }
+    private static MateriaPrima criarEstoque(Cenario cenario) {
+        if (cenario == null) throw new IllegalArgumentException("Informe o cenário.");
+        return new MateriaPrima(1, "Silício", cenario.getEstoque(), "unidades", 10, 2);
+    }
+    public Cenario getCenario() { return cenario; }
+    public void setEstrategia(EstrategiaProducao novaEstrategia) {
+        if (novaEstrategia == null) throw new IllegalArgumentException("Informe uma estratégia.");
+        estrategiaAtual = novaEstrategia;
+    }
+    public String getNomeEstrategia() {
+        return estrategiaAtual == null ? "Seleção manual" : estrategiaAtual.getNomeEstrategia();
+    }
+    public void executarProximaProducao() {
+        if (estrategiaAtual == null) throw new IllegalStateException("Selecione uma estratégia.");
+        Demanda selecionada = estrategiaAtual.selecionarDemanda(Collections.unmodifiableList(demandas), budget);
+        if (selecionada == null) {
+            System.out.println("[AVISO] Nenhuma demanda elegível para a estratégia e orçamento atuais.");
+            return;
+        }
+        if (!demandas.contains(selecionada) || selecionada.getStatus() != StatusDemanda.PENDENTE)
+            throw new IllegalStateException("Estratégia retornou demanda inválida.");
+        System.out.println("[SILICON FAB] Lote selecionado: " + selecionada.getTipoProduto());
+        fabricarDemanda(selecionada.getTipoProduto());
+    }
+    public void gerarAuditoriaGeral() {
+        List<Auditavel> componentes = new ArrayList<>();
+        componentes.addAll(maquinas);
+        componentes.addAll(produtosTentados);
+        System.out.println("=== AUDITORIA DA SALA LIMPA (inclui rejeitados) ===");
+        int intervencoes = 0;
+        for (Auditavel componente : componentes) {
+            System.out.println(componente.gerarRelatorioDiagnostico());
+            if (componente.precisaManutencao()) intervencoes++;
+        }
+        System.out.println("Componentes que requerem intervenção: " + intervencoes);
+    }
+    public int getTotalTentativas() { return produtosTentados.size(); }
+    public List<Demanda> getDemandas() { return Collections.unmodifiableList(demandas); }
+    public List<Maquina> getMaquinas() { return Collections.unmodifiableList(maquinas); }
+    public List<Produto> getProdutosFabricados() { return Collections.unmodifiableList(produtosFabricados); }
+    public void setSeed(long seed) {
+        for (int i = 0; i < maquinas.size(); i++) maquinas.get(i).setSeed(seed + i);
     }
 }

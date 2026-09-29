@@ -1,127 +1,75 @@
-SILICON FAB - JUSTIFICATIVA DA TAREFA 2
+SILICON FAB - JUSTIFICATIVA DA TAREFA 3
 Giovanni Innecco (RA 282589) e Rodrigo Soares (RA 197361)
 
-1. Escolha do tema e relação com Controle e Automação
+1. Tema e evolução
 
-Escolhemos desenvolver uma fábrica de microcontroladores STM32 devido à relação direta desse tema com nossa formação em Controle e Automação. Na justificativa da Tarefa 1, destacamos nosso contato com esse tipo de hardware em aulas e projetos de extensão, especialmente em aplicações envolvendo sistemas de controle, ECU e telemetria. Mantivemos o tema nesta etapa para que as classes e os elementos do sistema permanecessem inseridos em um contexto com o qual temos familiaridade.
+Mantemos a fábrica de microcontroladores STM32, ligada à nossa formação em Controle e Automação e ao contato com sensores, atuadores, ECU e telemetria. STM32G, STM32F e STM32H representam níveis de complexidade de circuito. Fotolitografia, encapsulamento e inspeção formam a linha, transportada pela Esteira. Todos os números são didáticos, sem pretensão de reproduzir especificações comerciais.
 
-A Silicon Fab consiste em uma simulação didática e simplificada de uma fábrica de microcontroladores. O objetivo não é reproduzir integralmente o processo industrial de fabricação de semicondutores. Dessa forma, valores como consumo de silício, tempos de processamento, custos e níveis de qualidade foram definidos especificamente para o exercício e não correspondem às especificações reais dos componentes.
+A tarefa 3 acrescenta decisões de programação da produção, estados tipados, auditoria transversal, cenários e desgaste. A fabricação manual, a compra de silício, o controle de orçamento e a separação entre insumos e produtos acabados continuam disponíveis. A API de status de Produto passa intencionalmente de String para StatusProduto para eliminar estados digitados incorretamente. Os construtores antigos do gerenciador permanecem disponíveis para uso manual e testes com máquinas injetadas.
 
-2. Evolução da fábrica
+2. Padrão Strategy aplicado à programação de lotes
 
-Na primeira versão do projeto, havia apenas um fluxo básico de produção, e a etapa de inspeção aprovava todos os produtos. Nesta segunda versão, a fábrica foi ampliada para incluir três tipos de microcontroladores, três tipos de máquinas, demandas por produtos finais, inspeção com comportamento probabilístico, orçamento e armazém.
+EstrategiaProducao define selecionarDemanda(List<Demanda>, double) e getNomeEstrategia(). O filtro comum elegivel aceita apenas PENDENTE. As implementações não alteram pedidos, orçamento nem estoque:
 
-Como a tarefa exige a utilização de hierarquias de produtos e máquinas, criamos as classes STM32G, STM32F e STM32H como subclasses de Produto, enquanto MaquinaFotolitografia, MaquinaEncapsulamento e EstacaoInspecao são subclasses de Maquina.
+- EstrategiaFilaSilicio: atende a primeira demanda pendente. Representa a fila de entrada de lotes na sala limpa.
+- EstrategiaMaiorLoteSTM32: atende o maior pedido pendente, priorizando volume de chips de um modelo. Não filtra orçamento, para evidenciar a diferença em relação à próxima estratégia.
+- EstrategiaRendimentoChips: escolhe o maior lote inteiro financeiramente viável. Representa maximizar chips entregáveis no orçamento atual. Lotes empatados mantêm a ordem de chegada.
 
-No modelo desenvolvido, o encapsulamento desempenha o papel da etapa de embalagem solicitada pelo enunciado. Ele representa, de forma simplificada, a proteção do chip e sua preparação para conexão com elementos externos.
+Interpretamos demanda viável como aquela cujo saldo inteiro cabe no orçamento operacional, sem prever rejeições. Cada tentativa custa R$ 18 (10 de fotolitografia, 5 de encapsulamento e 3 de inspeção). O material já está em estoque; sua aquisição não é cobrada novamente. A estratégia não recebe estoque pela interface, portanto cabe ao gerenciador validar os insumos. Não há promessa de atender todo o lote após rejeições: cada nova tentativa é validada e a falta de recursos cancela o saldo.
 
-Cada objeto Produto representa uma unidade individual de microcontrolador, possuindo seu próprio identificador e resultado de inspeção. Essa escolha permite realizar rejeições individualmente e contabilizar de forma clara as unidades produzidas, rejeitadas e armazenadas.
+GerenciadorProducao guarda apenas uma referência EstrategiaProducao. Main instancia as implementações e injeta a escolhida; executarProximaProducao delega a seleção à interface. O gerenciador não importa nem instancia estratégias concretas. Seleção manual e automática compartilham fabricarDemanda, evitando duplicação.
 
-3. Produtos, recursos e fluxo de produção
+3. Demandas e enumerações
 
-Os parâmetros definidos para cada produto são:
+StatusDemanda substitui o boolean atendida. PENDENTE inicia como EM_PRODUCAO; aprovações reduzem a pendência até CONCLUIDA. Falta de orçamento ou silício produz CANCELADA, preservando o saldo. Uma demanda cancelada não pode receber aprovações nem ser iniciada diretamente. Atualizar um pedido ainda pendente substitui o saldo sem mudar sua posição na fila. Reabrir um pedido concluído ou cancelado o coloca no fim da fila. Essa regra evita que os cadastros vazios iniciais imponham a ordem STM32G/F/H independentemente da entrada real dos pedidos. Quantidade zero encerra o saldo, preservando o armazém.
 
-STM32G: 3 unidades de material, 2 unidades de tempo e qualidade 0,5.
-STM32F: 5 unidades de material, 4 unidades de tempo e qualidade 0,7.
-STM32H: 10 unidades de material, 6 unidades de tempo e qualidade 0,9.
+Quebra de máquina interrompe a fabricação e devolve a demanda a PENDENTE; não é cancelamento por recursos. EstadoMaquina representa DESLIGADA, LIGADA e QUEBRADA. StatusProduto representa AGUARDANDO, PROCESSADO, ENCAPSULADO, APROVADO e REJEITADO. As etapas comparam enums, e não textos. Nomes dos modelos continuam Strings porque são identificadores de catálogo, não estados.
 
-O atributo qualidade representa a qualidade associada ao produto e influencia diretamente a chance de rejeição durante a inspeção, conforme a orientação do enunciado. Esses valores fazem parte exclusivamente da modelagem utilizada no projeto e não significam que um modelo comercial real possua qualidade inferior ou superior a outro.
+4. Cenários e desgaste
 
-Cada unidade produzida percorre, sequencialmente, as etapas de fotolitografia, encapsulamento e inspeção. A esteira é responsável pelo transporte dos produtos por meio de uma fila. O silício necessário à fabricação é retirado diretamente do estoque pelo gerenciador de produção.
+Cenario.IDEAL: R$ 10.000, 1.000 unidades de silício, probabilidades iniciais de 2%/1%/0,5% em fotolitografia/encapsulamento/inspeção, risco inicial do produto de 1% e desgaste uniforme entre 0 e 0,3 por uso.
+Cenario.APOCALIPTICO: R$ 180, 50 unidades de silício, probabilidades iniciais de 80%/40%/20% em fotolitografia/encapsulamento/inspeção, risco inicial de 40% e desgaste uniforme entre 0 e 3 por uso.
 
-Somente os produtos aprovados pela avaliação final da estação de inspeção são encaminhados ao armazém.
+A escolha ocorre antes do menu principal. Cada máquina começa com saúde 100. A probabilidade efetiva é min(1, probabilidadePropria * fatorCenario * 100 / saude), inversamente proporcional à saúde até a saturação. O fator do cenário é 0,1 no Ideal e 4 no Apocalíptico, preservando as diferenças próprias das máquinas (0,20/0,10/0,05). Saúde zero retorna risco 1 e bloqueia a operação antes de qualquer divisão. O desgaste é aplicado ao fim de cada uso válido, inclusive em ciclos rejeitados. A operação que termina levando a saúde a zero é concluída; a próxima é bloqueada. Saúde zero preserva o estado QUEBRADA mesmo ao desligar a linha. O limiar de manutenção padrão é 30 e pode ser configurado. setSaude aceita apenas valores finitos entre 0 e 100 e permite restauração por código, mantendo a máquina desligada. Reparos pelo menu são opcionais no enunciado e não foram incluídos.
 
-4. Falhas e inspeção
+setSeed permite reproduzir sorteios por máquina; o gerenciador distribui sementes consecutivas. Execuções normais continuam aleatórias. Os cenários mudam probabilidades, não garantem um resultado específico de cada sorteio.
 
-O enunciado estabelece que as etapas de processamento e embalagem podem aumentar o risco acumulado de falha do produto, enquanto a própria inspeção também pode apresentar falhas.
+5. Qualidade, falhas e auditoria
 
-Para representar esse comportamento, definimos que:
+Mantivemos da tarefa 2 os consumos 3/5/10, tempos 2/4/6 e qualidades 0,5/0,7/0,9 para STM32G/F/H. Qualidade é o nível de exigência do modelo, fixo durante o turno; o risco acumulado registra sua degradação. A chance de rejeição é min(1, qualidade * (0,10 + riscoAcumulado)). Falhas de fotolitografia e encapsulamento acrescentam 0,10 e 0,05 ao risco, limitado a 1. Como antes, uma falha da inspeção pode deixar passar um chip que seria rejeitado; por isso aprovação não implica ausência de risco.
 
-A fotolitografia possui 20% de chance de acrescentar 0,10 à probabilidade de falha acumulada.
-O encapsulamento possui 10% de chance de acrescentar 0,05 à probabilidade de falha acumulada.
+Auditavel é implementada por Maquina e Produto, duas hierarquias distintas. Ambas fornecem gerarRelatorioDiagnostico e precisaManutencao. Máquinas sinalizam saúde abaixo do limiar. Produtos rejeitados ou com qualidade * riscoAcumulado >= 0,15 requerem intervenção. Para um produto, intervenção significa revisão ou segregação, não reparo mecânico.
 
-A avaliação inicial realizada pela inspeção utiliza a seguinte expressão:
+gerarAuditoriaGeral cria uma coleção de Auditavel com máquinas e todos os produtos tentados, inclusive rejeitados, e chama os mesmos métodos polimorficamente. O diagnóstico identifica estado, saúde ou qualidade, risco e necessidade de intervenção. A coleção de produtos tentados também evita depender do contador estático global para o resumo de cada gerenciador.
 
-chanceRejeicao = qualidade * (0.10 + probabilidadeFalhaAcumulada)
+6. Armazém, lotes e menu
 
-Para um mesmo nível de risco acumulado durante o fluxo de produção, a chance de rejeição é diretamente proporcional à qualidade do produto.
+Cada execução iniciada recebe um número sequencial de lote dentro do turno. Todas as tentativas daquela execução compartilham o lote; os números reiniciam ao abrir uma nova fábrica. Só aprovações entram no armazém. A consulta lista identificador, modelo, estado, qualidade, risco, lote e intervenção por unidade, além das quantidades por modelo e do total. Os insumos brutos têm consulta separada. O diagnóstico de cada chip também mostra ID, nome, quantidade e unidade do insumo efetivamente transportado, por meio de uma PorcaoMateriaPrima imutável. A origem só pode ser registrada antes do processamento, uma única vez, com a quantidade exigida pelo modelo.
 
-Após essa avaliação, é realizado um sorteio independente no qual existe 5% de chance de a estação de inspeção falhar e liberar o produto, independentemente do resultado inicial. Essa situação representa uma falha de detecção: uma unidade que deveria ser rejeitada pode ser aprovada incorretamente. Caso a avaliação inicial já determine a aprovação do produto, ele permanece aprovado.
+O console usa o tema SILICON FAB e agrupa demandas, fabricação e consultas em submenus. A troca de estratégia e a auditoria são acessíveis diretamente. Cenário, orçamento e estratégia ativa permanecem no cabeçalho principal. Entradas inválidas são tratadas; fim da entrada encerra o programa sem rastreamento de exceção. Não usamos cores ANSI para preservar legibilidade em terminais diferentes.
 
-Esse comportamento constitui uma decisão de implementação do grupo. O enunciado exige a possibilidade de uma inspeção incorreta, mas não determina exatamente seu mecanismo nem exige a representação dos dois possíveis tipos de erro.
+7. Encapsulamento, limites e validação
 
-Se a probabilidade inicial de rejeição for representada por p, a probabilidade final de rejeição será:
+Atributos são privados e consultas de listas não permitem alterar sua estrutura. Métodos validam quantidades e valores finitos. Não há concorrência de threads: os pedidos competem pela seleção e pelos recursos em uma linha sequencial. Não há persistência nem espera real. O orçamento é verificado antes de iniciar cada unidade, evitando ciclos iniciados sem dinheiro para todas as etapas.
 
-0.95 * p
+TesteTarefa3 verifica estratégias e empates, transições, cancelamento e reabertura, estimativas sem overflow, troca dinâmica, lotes, rejeições, custos, estoque, desgaste, saúde zero, auditoria, cenários e interação com o console. Testes críticos de produção injetam uma estação de resultado controlado; testes de cenários usam sementes. A compilação não requer bibliotecas externas. VERIFICACAO_TAREFA_3.md relaciona requisitos, implementação, testes e passos de entrega ainda externos ao projeto.
 
-Consequentemente, no fluxo da fábrica, a probabilidade final pode ser expressa como:
+8. Capacidade, abastecimento e estoque mínimo
 
-0.95 * qualidade * (0.10 + probabilidadeFalhaAcumulada)
+Capacidade física é expressa em unidades de silício, tanto na máquina quanto na esteira. A linha padrão suporta 10 unidades por ciclo, suficiente para STM32H; G e F consomem 3 e 5. A esteira mantém ainda um limite independente de itens (um na linha padrão). Em filas maiores, a carga total também não pode ultrapassar a capacidade física. Máquinas validam a carga antes de processar, e o gerenciador verifica toda a linha antes de criar unidades ou consumir recursos. Uma incompatibilidade de capacidade mantém a demanda pendente, pois não é falta de orçamento ou insumo.
 
-Na ausência de risco acumulado adicional, as probabilidades finais de rejeição são:
+quantidadeMinima significa estoque mínimo antes de iniciar cada tentativa. Assim, com mínimo 10, estoque 10 e consumo 3, o primeiro ciclo pode consumir até restarem 7; o próximo é bloqueado até reposição. Não é uma reserva obrigatória após o consumo. Essa interpretação explicita o limite que o enunciado deixa em aberto. O menu de estoque mostra esse mínimo e a mensagem de interrupção menciona o limite.
 
-STM32G: 4,75%.
-STM32F: 6,65%.
-STM32H: 8,55%.
+retirarPorcao debita o estoque uma única vez e cria o registro do insumo separado. A esteira transporta essa porção até a entrada da linha, e o produto registra a porção recebida antes da fotolitografia. Em seguida, o chip percorre as etapas de produção pela mesma esteira. O abastecimento não mistura matéria-prima e chips simultaneamente. A compra posterior não altera os registros históricos de origem.
 
-5. Demandas e orçamento
+9. Visão de expansão futura
 
-No sistema, a demanda representa a quantidade de unidades que ainda precisam ser aprovadas para que determinado pedido seja atendido.
+Uma próxima evolução da Silicon Fab pode incluir programação e testes elétricos dos microcontroladores após o encapsulamento. Isso permitiria simular gravação de firmware e testes de comunicação com sensores, mantendo a conexão com aplicações de Controle e Automação.
 
-Optamos por repetir automaticamente as tentativas de produção quando ocorre uma rejeição, até que a demanda seja completamente atendida ou não existam recursos suficientes para iniciar um novo ciclo completo de fabricação.
+Outra expansão possível é planejar manutenção preventiva a partir da saúde e do histórico das máquinas, com custos e tempo de parada. A rastreabilidade atual também permite evoluir para múltiplos lotes de silício e fornecedores, associando defeitos detectados à origem do material. Essas possibilidades são propostas para as próximas etapas, não funcionalidades já implementadas.
 
-Uma unidade rejeitada continua consumindo material, custo operacional e tempo de produção, mas não reduz a quantidade pendente da demanda. Caso a produção seja interrompida por falta de recursos, as unidades que já foram aprovadas são preservadas, permitindo a continuidade do atendimento posteriormente.
+10. Revisão da tarefa 3 em 28/09/2026
 
-Ao atualizar uma demanda, a nova quantidade informada substitui sua quantidade pendente atual. A utilização do valor zero encerra a pendência, mas não remove produtos já existentes no armazém. Essas regras são decisões de modelagem adotadas pelo grupo, uma vez que o enunciado não especifica detalhadamente o comportamento de atualizações parciais ou mecanismos automáticos de reposição.
+A ordem FIFO foi ajustada para preservar a posição de pedidos ainda pendentes ao editar quantidades. Somente pedidos reabertos entram no fim. A partida das máquinas agora está dentro do bloco de desligamento garantido: se alguma falhar ao ligar, todas são desligadas e o pedido volta a pendente, sem consumir recursos. Cenário ausente é rejeitado com uma mensagem de validação.
 
-O orçamento inicial da fábrica é de R$ 1.000,00, acompanhado de 100 unidades de material já disponíveis em estoque.
-
-Os custos definidos foram:
-
-Compra de material: R$ 2,00 por unidade.
-Fotolitografia: R$ 10,00 por microcontrolador.
-Encapsulamento: R$ 5,00 por microcontrolador.
-Inspeção: R$ 3,00 por microcontrolador.
-
-O orçamento é debitado tanto na aquisição de matéria-prima quanto na operação das máquinas, conforme exigido pela tarefa. Entretanto, a retirada de material já presente no estoque não gera uma segunda cobrança, pois seu custo foi considerado no momento da compra.
-
-A aquisição de matéria-prima é realizada manualmente pelo menu. O sistema não contempla vendas, geração de lucro ou reposição automática do orçamento. Da mesma forma, os tempos de produção são representados apenas por valores acumulados de tempo simulado, sem pausas reais durante a execução do programa.
-
-6. Organização orientada a objetos
-
-As classes abstratas Produto e Maquina concentram características e comportamentos comuns às suas respectivas hierarquias. As subclasses utilizam super() para aproveitar a implementação das classes superiores e sobrescrevem os métodos necessários para representar seus comportamentos específicos.
-
-O gerenciador de produção percorre uma coleção de objetos do tipo Maquina e realiza chamadas ao método processar(Produto). Dessa maneira, cada equipamento executa seu próprio comportamento por meio de polimorfismo, sem que o gerenciador precise identificar explicitamente o tipo de cada máquina.
-
-O processamento específico de cada produto também define uma configuração de circuito:
-
-STM32G: perfil de controle básico de sensores e atuadores.
-STM32F: perfil de controle e processamento de sinais.
-STM32H: perfil de processamento de maior complexidade.
-
-O atributo configuracaoCircuito é inicialmente definido como "Não configurado" e recebe seu valor durante o processamento da unidade pela implementação específica da subclasse.
-
-A máquina de fotolitografia chama o método processar() do produto sem selecionar seu perfil por meio de estruturas condicionais. Dessa forma, é o próprio objeto que determina sua configuração de acordo com sua classe concreta. Posteriormente, o armazém exibe a configuração armazenada.
-
-Esses perfis também são fictícios e foram definidos apenas para representar o resultado do processamento dentro do modelo. Eles não representam a execução real de algoritmos de controle pelo microcontrolador durante seu processo de fabricação.
-
-Utilizamos ArrayList para armazenar demandas, máquinas, produtos no armazém e elementos da fila da esteira. Os atributos mutáveis são privados, e as coleções internas não são expostas diretamente.
-
-As constantes relacionadas ao consumo de recursos foram mantidas nas subclasses dos microcontroladores, permitindo consultar essas informações sem que seja necessário criar objetos apenas para utilizá-los como catálogo.
-
-O contador estático presente em Produto registra todas as instâncias criadas, inclusive aquelas que posteriormente são rejeitadas durante a inspeção.
-
-Também utilizamos métodos privados para separar cálculos, validações e operações internas. A divisão das principais responsabilidades ficou definida da seguinte forma:
-
-Main: apresenta o menu e realiza a leitura das entradas.
-GerenciadorProducao: coordena o funcionamento geral da fábrica.
-Demanda: registra e acompanha as quantidades pendentes.
-MateriaPrima: controla o estoque de material.
-Esteira: realiza o transporte dos produtos.
-Subclasses de Maquina: executam as diferentes etapas do processo produtivo.
-
-7. Verificação e limitações
-
-O programa completo foi compilado e submetido a testes.
-
-Os testes mantidos no projeto verificam aspectos como reposição de unidades rejeitadas, custos de produção, controle de estoque, atendimento parcial de demandas, retomada da produção, validação de entradas e funcionamento das opções disponíveis no menu.
+Os comentários do código foram reduzidos a uma linha por comentário, com foco nas regras que não ficam óbvias pelo nome dos métodos. A suíte da tarefa 3 passou em 87 verificações; a dos requisitos herdados, em 57.

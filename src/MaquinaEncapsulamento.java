@@ -1,22 +1,25 @@
-// Protege o circuito e pode acrescentar risco ao produto.
+// Protege o chip, mas pode deixar defeitos no caminho.
 public class MaquinaEncapsulamento extends Maquina {
 
-    // Configura os parâmetros da etapa de encapsulamento.
     public MaquinaEncapsulamento() {
-        super("Máquina de Encapsulamento", 1, 0.10, 5.0);
+        this(10);
     }
 
-    // Encapsula o produto e sorteia um possível aumento de risco.
+    // A capacidade usa unidades de silício.
+    public MaquinaEncapsulamento(int capacidade) {
+        super("Máquina de Encapsulamento", capacidade, 0.10, 5.0);
+    }
+
     @Override
     public void processar(Produto produto) {
-        validarProcessamento(produto, "Processado");
+        validarProcessamento(produto, StatusProduto.PROCESSADO);
         if (verificarFalha(getProbabilidadeFalha())) {
             produto.aumentarProbabilidadeFalha(0.05);
         }
-        produto.setStatus("Encapsulado");
+        produto.setStatus(StatusProduto.ENCAPSULADO);
+        registrarUso();
     }
 
-    // Identifica esta etapa da linha.
     @Override
     public String getTipo() {
         return "Encapsulamento";
