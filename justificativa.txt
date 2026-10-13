@@ -1,4 +1,4 @@
-SILICON FAB - JUSTIFICATIVA DA TAREFA 3
+SILICON FAB - JUSTIFICATIVA DA TAREFA 4
 Giovanni Innecco (RA 282589) e Rodrigo Soares (RA 197361)
 
 1. Tema e evolução
@@ -52,7 +52,7 @@ O console usa o tema SILICON FAB e agrupa demandas, fabricação e consultas em 
 
 Atributos são privados e consultas de listas não permitem alterar sua estrutura. Métodos validam quantidades e valores finitos. Não há concorrência de threads: os pedidos competem pela seleção e pelos recursos em uma linha sequencial. Não há persistência nem espera real. O orçamento é verificado antes de iniciar cada unidade, evitando ciclos iniciados sem dinheiro para todas as etapas.
 
-A compilação não requer bibliotecas externas. Para compilar na raiz do projeto, use javac -encoding UTF-8 -d bin src/*.java. Para executar, use java -cp bin Main.
+A aplicação e os testes não requerem bibliotecas externas. O Gradle Wrapper é a ferramenta oficial de construção a partir da tarefa 4. Os comandos de build, execução e documentação estão no README.md.
 
 8. Capacidade, abastecimento e estoque mínimo
 
@@ -67,3 +67,23 @@ retirarPorcao debita o estoque uma única vez e cria o registro do insumo separa
 Uma próxima evolução da Silicon Fab pode incluir programação e testes elétricos dos microcontroladores após o encapsulamento. Isso permitiria simular gravação de firmware e testes de comunicação com sensores, mantendo a conexão com aplicações de Controle e Automação.
 
 Outra expansão possível é planejar manutenção preventiva a partir da saúde e do histórico das máquinas, com custos e tempo de parada. A rastreabilidade atual também permite evoluir para múltiplos lotes de silício e fornecedores, associando defeitos detectados à origem do material. Essas possibilidades são propostas para as próximas etapas, não funcionalidades já implementadas.
+
+10. Gradle e documentação da tarefa 4
+
+Movemos os fontes para src/main/java, mantendo as classes sem pacotes e os nomes já usados. O plugin application cuida da compilação e da execução de Main com Java 25. O Gradle Wrapper 9.1.0 acompanha o projeto com scripts para Windows e Linux/macOS e verifica o SHA-256 da distribuição. A primeira execução baixa o Gradle; as seguintes reutilizam esse download. Nenhum arquivo compilado em bin ou build é necessário para começar.
+
+O Javadoc fica diretamente nas classes, interfaces, enums e métodos, com parâmetros, retornos, exceções e autoria. Mantivemos explicações curtas em português e os comentários de lógica no formato que já usávamos. A documentação gerada fica em build/docs/javadoc/index.html.
+
+11. Erros e consistência da fábrica
+
+PlantaException reúne as falhas recuperáveis da fábrica. RecursoInsuficienteException indica falta de silício ou orçamento; DemandaInvalidaException representa pedidos inexistentes ou estados incompatíveis; EquipamentoIndisponivelException representa impedimentos de estado, ocupação e capacidade. Valores de argumentos fora dos limites continuam usando IllegalArgumentException. A interface captura esses erros, explica o motivo e retorna ao menu principal.
+
+A unidade de confirmação continua sendo uma tentativa de fabricar um chip. Verificamos os recursos antes dela. Se faltarem recursos após algumas tentativas concluídas, cancelamos apenas o saldo, preservando o consumo e os chips que realmente passaram pela linha. Isso mantém o comportamento da tarefa 3. Rejeição na inspeção não é exceção: é um resultado normal, com consumo, custo, desgaste e registro de auditoria.
+
+Se uma etapa lançar uma exceção durante uma tentativa, restauramos exatamente o estoque e o orçamento anteriores ao ciclo, a saúde das máquinas e o contador de inspeções. A esteira fica vazia, a linha desliga e a demanda volta a pendente. A tentativa incompleta não entra no armazém nem nos totais confirmados. Os IDs já atribuídos não são reutilizados e a sequência de sorteios não é retrocedida; o contador estático de Produto continua contando instâncias criadas.
+
+O catch de RuntimeException fica restrito ao ciclo, onde existe uma recuperação concreta. Depois de restaurar os dados, relançamos as exceções de domínio ou envolvemos uma falha inesperada em FalhaProducaoException, preservando a causa original e informando seu motivo. Não usamos captura silenciosa para continuar com dados parciais. Essa recuperação cobre o estado modelado pelas três etapas da fábrica; uma futura máquina com novos dados mutáveis também precisará participar da restauração.
+
+12. Verificações da tarefa 4
+
+TesteFabrica usa Java puro e lança AssertionError quando uma condição não é atendida. A tarefa verificarFabrica é chamada por test e build. Os casos cobrem regras herdadas, transições, recursos insuficientes, compra, capacidade, cenários e menu. Uma estação de teste lança um erro depois de inspecionar para verificar que os recursos e contadores do ciclo são restaurados, inclusive quando um chip anterior já foi concluído. Sementes fixas tornam esses casos reproduzíveis.
