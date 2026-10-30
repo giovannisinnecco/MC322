@@ -13,6 +13,9 @@ public abstract class Maquina implements Auditavel {
     private final double probabilidadeFalha;
     private final double custoOperacao;
     private final Random random = new Random();
+    private final ControladorEtapa controlador;
+    private final SensorAlinhamento sensorAlinhamento;
+    private final AtuadorPrecisao atuador;
 
     /**
      * Cria uma máquina desligada, com saúde 100 e os limites informados.
@@ -34,6 +37,9 @@ public abstract class Maquina implements Auditavel {
             throw new IllegalArgumentException("O custo deve ser finito e não negativo.");
         }
         this.nome = nome;
+        this.controlador = new ControladorEtapa(nome);
+        this.sensorAlinhamento = new SensorAlinhamento(nome, 10.0);
+        this.atuador = new AtuadorPrecisao(nome, capacidadeMaxima);
 
         this.capacidadeMaxima = capacidadeMaxima;
         this.probabilidadeFalha = probabilidadeFalha;
@@ -60,12 +66,14 @@ public abstract class Maquina implements Auditavel {
     public void ligar() {
         if (estado == EstadoMaquina.QUEBRADA) throw new EquipamentoIndisponivelException("Máquina quebrada: " + nome);
         estado = EstadoMaquina.LIGADA;
+        controlador.ativar();
     }
     /**
      * Interrompe a operação do equipamento.
      */
     public void desligar() {
         if (estado != EstadoMaquina.QUEBRADA) estado = EstadoMaquina.DESLIGADA;
+        controlador.desativar();
     }
     /**
      * Consulta true se a máquina está ligada.
@@ -134,13 +142,9 @@ public abstract class Maquina implements Auditavel {
         if (produto == null) {
             throw new IllegalArgumentException("O produto deve ser informado.");
         }
-        if (!verificarCapacidade(produto.getQuantidadeMateriaPrimaPorUnidade())) {
-            throw new EquipamentoIndisponivelException("Carga excede a capacidade de " + nome + ".");
-        }
-        if (statusEsperado != produto.getStatus()) {
-            throw new EquipamentoIndisponivelException("A máquina " + nome
-                    + " exige um produto no estado " + statusEsperado + ".");
-        }
+        atuador.validarCarga(produto.getQuantidadeMateriaPrimaPorUnidade(), capacidadeMaxima);
+        sensorAlinhamento.validarLeitura(saude);
+        controlador.validar(statusEsperado, produto.getStatus());
     }
 
     /**
@@ -214,7 +218,18 @@ public abstract class Maquina implements Auditavel {
      */
     @Override
     public String gerarRelatorioDiagnostico() {
-        return String.format("%s | %s | saúde %.2f | falha %.2f%% | manutenção: %s",
-                nome, estado, saude, 100 * getProbabilidadeFalha(), precisaManutencao());
+        return String.format("%s | %s | saúde %.2f | falha %.2f%% | manutenção: %s"
+                        + "\n  %s\n  %s\n  %s",
+                nome, estado, saude, 100 * getProbabilidadeFalha(), precisaManutencao(),
+                controlador.gerarRelatorioDiagnostico(), sensorAlinhamento.gerarRelatorioDiagnostico(),
+                atuador.gerarRelatorioDiagnostico());
+    }
+
+    /** Propaga a necessidade de manutenção para os componentes internos.
+     * @return true se a máquina ou alguma parte requer intervenção
+     */
+    boolean algumaPartePrecisaManutencao() {
+        return precisaManutencao() || controlador.precisaManutencao()
+                || sensorAlinhamento.precisaManutencao() || atuador.precisaManutencao();
     }
 }

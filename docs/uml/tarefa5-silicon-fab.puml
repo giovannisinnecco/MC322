@@ -1,0 +1,53 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam class {
+  BackgroundColor #F7FAFC
+  BorderColor #28536B
+}
+
+class GerenciadorProducao {
+  -salaLimpa: SalaLimpa
+  +fabricarDemanda(tipoProduto)
+  +gerarAuditoriaGeral()
+}
+class SalaLimpa {
+  -etapas: List<Maquina>
+  +gerarRelatorioDiagnostico(): String
+  +precisaManutencao(): boolean
+}
+abstract class Maquina {
+  -controlador: ControladorEtapa
+  -sensorAlinhamento: SensorAlinhamento
+  -atuador: AtuadorPrecisao
+  +processar(produto)
+  +gerarRelatorioDiagnostico(): String
+}
+class MaquinaFotolitografia
+class MaquinaEncapsulamento
+class EstacaoInspecao
+class ControladorEtapa {
+  -etapa: String
+  -ativo: boolean
+  +validar(esperado, recebido)
+}
+class SensorAlinhamento {
+  -etapa: String
+  -saudeMinima: double
+  +validarLeitura(saude)
+}
+class AtuadorPrecisao {
+  -etapa: String
+  -resolucao: int
+  +validarCarga(carga, capacidade)
+}
+
+GerenciadorProducao *-- "1" SalaLimpa : ciclo de vida da planta
+SalaLimpa o-- "1..*" Maquina : etapas agrupadas
+Maquina <|-- MaquinaFotolitografia
+Maquina <|-- MaquinaEncapsulamento
+Maquina <|-- EstacaoInspecao
+Maquina *-- "1" ControladorEtapa
+Maquina *-- "1" SensorAlinhamento
+Maquina *-- "1" AtuadorPrecisao
+@enduml

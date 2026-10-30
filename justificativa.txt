@@ -1,4 +1,4 @@
-SILICON FAB - JUSTIFICATIVA DA TAREFA 4
+SILICON FAB - JUSTIFICATIVA DA TAREFA 5
 Giovanni Innecco (RA 282589) e Rodrigo Soares (RA 197361)
 
 1. Tema e evolução
@@ -40,7 +40,7 @@ Mantivemos da tarefa 2 os consumos 3/5/10, tempos 2/4/6 e qualidades 0,5/0,7/0,9
 
 Auditavel é implementada por Maquina e Produto, duas hierarquias distintas. Ambas fornecem gerarRelatorioDiagnostico e precisaManutencao. Máquinas sinalizam saúde abaixo do limiar. Produtos rejeitados ou com qualidade * riscoAcumulado >= 0,15 requerem intervenção. Para um produto, intervenção significa revisão ou segregação, não reparo mecânico.
 
-gerarAuditoriaGeral cria uma coleção de Auditavel com máquinas e todos os produtos tentados, inclusive rejeitados, e chama os mesmos métodos polimorficamente. O diagnóstico identifica estado, saúde ou qualidade, risco e necessidade de intervenção. A coleção de produtos tentados também evita depender do contador estático global para o resumo de cada gerenciador.
+gerarAuditoriaGeral percorre a Sala Limpa, que delega o diagnóstico a cada máquina e às suas partes, e também consulta todos os produtos tentados, inclusive rejeitados. Os métodos de Auditavel continuam sendo chamados polimorficamente. O diagnóstico identifica estado, saúde ou qualidade, risco e necessidade de intervenção. A coleção de produtos tentados também evita depender do contador estático global para o resumo de cada gerenciador.
 
 6. Armazém, lotes e menu
 
@@ -87,3 +87,11 @@ O catch de RuntimeException fica restrito ao ciclo, onde existe uma recuperaçã
 12. Verificações da tarefa 4
 
 TesteFabrica usa Java puro e lança AssertionError quando uma condição não é atendida. A tarefa verificarFabrica é chamada por test e build. Os casos cobrem regras herdadas, transições, recursos insuficientes, compra, capacidade, cenários e menu. Uma estação de teste lança um erro depois de inspecionar para verificar que os recursos e contadores do ciclo são restaurados, inclusive quando um chip anterior já foi concluído. Sementes fixas tornam esses casos reproduzíveis.
+
+13. Composição e agrupamento da tarefa 5
+
+A Sala Limpa agrupa as etapas de fotolitografia, encapsulamento e inspeção. Ela é uma estrutura de organização da linha, enquanto as máquinas mantêm seus próprios ciclos de vida para que possam ser configuradas nas construções manuais já usadas pela simulação. A coleção recebida é copiada e a visão interna não permite alterar sua estrutura.
+
+Cada máquina constrói seu próprio ControladorEtapa, SensorAlinhamento e AtuadorPrecisao dentro do construtor da classe base. O controlador acompanha se a etapa está ativa e valida a sequência de status; o sensor impede o processamento quando a saúde cai abaixo do limite de alinhamento; e o atuador confere se a carga cabe na capacidade. Nenhuma dessas partes é compartilhada entre máquinas ou entregue aos clientes da fábrica.
+
+O gerenciador conversa com a Sala Limpa, e cada máquina delega validações às partes privadas. A auditoria parte da Sala Limpa, percorre as máquinas e inclui o diagnóstico dos três componentes internos em cada etapa, além dos chips tentados. O diagrama UML correspondente está em docs/uml/tarefa5-silicon-fab.png; o arquivo PlantUML editável fica ao lado.

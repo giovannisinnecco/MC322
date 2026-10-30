@@ -129,12 +129,14 @@ public class Main {
     private static void menuConsultas(Scanner scanner, GerenciadorProducao g) {
         while (true) {
             System.out.println("\n--- CONSULTAS ---\n1 - Armazém de chips acabados"
-                    + "\n2 - Estoque de silício bruto\n3 - Resumo do turno\n0 - Voltar");
-            int opcao = lerInteiro(scanner, "Escolha: ", 0, 3);
+                    + "\n2 - Estoque de silício bruto\n3 - Resumo do turno"
+                    + "\n4 - Estrutura da Sala Limpa\n0 - Voltar");
+            int opcao = lerInteiro(scanner, "Escolha: ", 0, 4);
             if (opcao == 0) return;
             if (opcao == 1) g.exibirArmazem();
             if (opcao == 2) g.exibirEstoque();
             if (opcao == 3) exibirResumo(g);
+            if (opcao == 4) g.exibirEstruturaProducao();
         }
     }
     /**

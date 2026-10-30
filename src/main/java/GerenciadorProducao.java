@@ -11,7 +11,7 @@ public class GerenciadorProducao {
 
     private final ArrayList<Demanda> demandas = new ArrayList<>();
     private final ArrayList<Produto> produtosFabricados = new ArrayList<>();
-    private final ArrayList<Maquina> maquinas = new ArrayList<>();
+    private final SalaLimpa salaLimpa;
     private final MateriaPrima materiaPrima;
     private final Esteira esteira = new Esteira();
     private double budget;
@@ -54,9 +54,11 @@ public class GerenciadorProducao {
         }
         this.materiaPrima = materiaPrima;
         this.budget = budget;
-        maquinas.add(fotolitografia);
-        maquinas.add(encapsulamento);
-        maquinas.add(inspecao);
+        List<Maquina> etapas = new ArrayList<>();
+        etapas.add(fotolitografia);
+        etapas.add(encapsulamento);
+        etapas.add(inspecao);
+        this.salaLimpa = new SalaLimpa(etapas);
     }
 
     /**
@@ -111,20 +113,15 @@ public class GerenciadorProducao {
             throw new DemandaInvalidaException("Demanda não elegível; atualize o pedido de " + tipoProduto + ".");
         }
 
-        for (Maquina maquina : maquinas) {
-            if (maquina.getEstado() == EstadoMaquina.QUEBRADA) {
-                throw new EquipamentoIndisponivelException("Linha parada: " + maquina.getNome() + " quebrada.");
-            }
+        if (salaLimpa.algumaEtapaQuebrada()) {
+            throw new EquipamentoIndisponivelException("Linha parada: há uma etapa quebrada na Sala Limpa.");
         }
         int consumoPorUnidade = obterConsumoPorUnidade(tipoProduto);
         if (!esteira.verificarCarga(consumoPorUnidade)) {
             throw new EquipamentoIndisponivelException("Carga excede a capacidade da esteira; pedido permanece pendente.");
         }
-        for (Maquina maquina : maquinas) {
-            if (!maquina.verificarCapacidade(consumoPorUnidade)) {
-                throw new EquipamentoIndisponivelException("Carga excede a capacidade de " + maquina.getNome()
-                        + "; pedido permanece pendente.");
-            }
+        if (!salaLimpa.verificaCapacidade(consumoPorUnidade)) {
+            throw new EquipamentoIndisponivelException("Carga excede a capacidade de uma etapa da Sala Limpa; pedido permanece pendente.");
         }
         double custoCiclo = calcularCustoProducao();
         validarRecursos(demanda, consumoPorUnidade, custoCiclo);
@@ -136,15 +133,11 @@ public class GerenciadorProducao {
 
         try {
             esteira.ligar();
-            for (Maquina maquina : maquinas) {
-                maquina.ligar();
-            }
+            salaLimpa.ligarEtapas();
             while (demanda.getStatus() == StatusDemanda.EM_PRODUCAO) {
                 validarRecursos(demanda, consumoPorUnidade, custoCiclo);
 
-                boolean quebrada = false;
-                for (Maquina maquina : maquinas) quebrada |= maquina.getEstado() == EstadoMaquina.QUEBRADA;
-                if (quebrada) {
+                if (salaLimpa.algumaEtapaQuebrada()) {
                     demanda.pausar();
                     throw new EquipamentoIndisponivelException("Linha parada por desgaste. Demanda volta a pendente.");
                 }
@@ -163,9 +156,7 @@ public class GerenciadorProducao {
         } finally {
             // Mesmo com erro, a linha desliga e o pedido volta à fila.
             if (demanda.getStatus() == StatusDemanda.EM_PRODUCAO) demanda.pausar();
-            for (Maquina maquina : maquinas) {
-                maquina.desligar();
-            }
+            salaLimpa.desligarEtapas();
             esteira.esvaziar();
             esteira.desligar();
         }
@@ -212,10 +203,8 @@ public class GerenciadorProducao {
     private Produto produzirUnidade(String tipoProduto, int lote) {
         double estoqueAnterior = materiaPrima.getQuantidade();
         double budgetAnterior = budget;
-        double[] saudes = new double[maquinas.size()];
-        for (int i = 0; i < maquinas.size(); i++) saudes[i] = maquinas.get(i).getSaude();
-        EstacaoInspecao inspecao = (EstacaoInspecao) maquinas.get(2);
-        int inspecionados = inspecao.getTotalInspecionados();
+        double[] saudes = salaLimpa.salvarSaudes();
+        int inspecionados = salaLimpa.totalInspecionado();
         Produto produto = criarProduto(tipoProduto);
         produto.setLote(lote);
         if (cenario != null) produto.aumentarProbabilidadeFalha(cenario.getRiscoProduto());
@@ -223,10 +212,10 @@ public class GerenciadorProducao {
             PorcaoMateriaPrima porcao = materiaPrima.retirarPorcao(produto.getQuantidadeMateriaPrimaPorUnidade());
             esteira.adicionarMateriaPrima(porcao);
             produto.registrarOrigem(esteira.removerMateriaPrima());
-            for (Maquina maquina : maquinas) {
+            for (int etapa = 0; etapa < salaLimpa.quantidadeEtapas(); etapa++) {
                 esteira.adicionarItem(produto);
-                maquina.processar(esteira.removerItem());
-                budget -= maquina.getCustoOperacao();
+                salaLimpa.processarEtapa(etapa, esteira.removerItem());
+                budget -= salaLimpa.custoDaEtapa(etapa);
             }
             if (produto.getStatus() != StatusProduto.APROVADO && produto.getStatus() != StatusProduto.REJEITADO)
                 throw new IllegalStateException("A linha terminou sem um resultado de inspeção.");
@@ -234,8 +223,8 @@ public class GerenciadorProducao {
             // Desfaz só este chip; os anteriores já terminaram a linha.
             materiaPrima.restaurarQuantidade(estoqueAnterior);
             budget = budgetAnterior;
-            for (int i = 0; i < maquinas.size(); i++) maquinas.get(i).setSaude(saudes[i]);
-            inspecao.restaurarTotalInspecionados(inspecionados);
+            salaLimpa.restaurarSaudes(saudes);
+            salaLimpa.restaurarInspecoes(inspecionados);
             esteira.esvaziar();
             if (erro instanceof PlantaException falha) throw falha;
             throw new FalhaProducaoException("Falha inesperada na linha. A tentativa foi desfeita; "
@@ -308,6 +297,12 @@ public class GerenciadorProducao {
         System.out.printf("Preço de compra por unidade: R$ %.2f%n", materiaPrima.getCustoPorUnidade());
     }
 
+    /** Apresenta a hierarquia da linha sem devolver referências às suas partes.
+     */
+    public void exibirEstruturaProducao() {
+        System.out.println(salaLimpa.gerarRelatorioDiagnostico());
+    }
+
     /**
      * Mostra status, saldo e material estimado dos pedidos.
      */
@@ -369,11 +364,7 @@ public class GerenciadorProducao {
      * @return custo operacional de uma tentativa completa
      */
     private double calcularCustoProducao() {
-        double custo = 0.0;
-        for (Maquina maquina : maquinas) {
-            custo += maquina.getCustoOperacao();
-        }
-        return custo;
+        return salaLimpa.custoPorCiclo();
     }
 
     /**
@@ -435,7 +426,7 @@ public class GerenciadorProducao {
         this.cenario = cenario;
         if (estrategia == null) throw new IllegalArgumentException("Informe uma estratégia.");
         this.estrategiaAtual = estrategia;
-        for (Maquina maquina : maquinas) maquina.configurarCenario(cenario);
+        salaLimpa.configurarCenario(cenario);
     }
     /**
      * Abre o estoque de silício definido pelo cenário.
@@ -488,14 +479,13 @@ public class GerenciadorProducao {
      * Consulta máquinas e chips polimorficamente, incluindo os rejeitados.
      */
     public void gerarAuditoriaGeral() {
-        List<Auditavel> componentes = new ArrayList<>();
-        componentes.addAll(maquinas);
-        componentes.addAll(produtosTentados);
-        System.out.println("=== AUDITORIA DA SALA LIMPA (inclui rejeitados) ===");
+        System.out.println("=== AUDITORIA DA PLANTA (inclui chips rejeitados) ===");
         int intervencoes = 0;
-        for (Auditavel componente : componentes) {
-            System.out.println(componente.gerarRelatorioDiagnostico());
-            if (componente.precisaManutencao()) intervencoes++;
+        System.out.println(salaLimpa.gerarRelatorioDiagnostico());
+        if (salaLimpa.precisaManutencao()) intervencoes++;
+        for (Auditavel produto : produtosTentados) {
+            System.out.println("  Chip > " + produto.gerarRelatorioDiagnostico());
+            if (produto.precisaManutencao()) intervencoes++;
         }
         System.out.println("Componentes que requerem intervenção: " + intervencoes);
     }
@@ -513,7 +503,7 @@ public class GerenciadorProducao {
      * Consulta lista sem alteração estrutural; as máquinas continuam mutáveis.
      * @return lista sem alteração estrutural; as máquinas continuam mutáveis
      */
-    public List<Maquina> getMaquinas() { return Collections.unmodifiableList(maquinas); }
+    List<Maquina> getMaquinas() { return salaLimpa.etapasInternas(); }
     /**
      * Consulta lista sem alteração estrutural; os chips continuam mutáveis.
      * @return lista sem alteração estrutural; os chips continuam mutáveis
@@ -524,6 +514,6 @@ public class GerenciadorProducao {
      * @param seed semente inicial dos sorteios
      */
     public void setSeed(long seed) {
-        for (int i = 0; i < maquinas.size(); i++) maquinas.get(i).setSeed(seed + i);
+        salaLimpa.semearSorteios(seed);
     }
 }

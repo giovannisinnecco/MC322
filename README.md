@@ -45,6 +45,7 @@ verificações e gera o JAR em `build/libs/` e as distribuições em
 - `build.gradle` e `settings.gradle`: configuração da aplicação Java.
 - `gradle/wrapper/`, `gradlew` e `gradlew.bat`: Gradle Wrapper.
 - `justificativa.txt`: escolhas da dupla e regras da simulação.
+- `docs/uml/tarefa5-silicon-fab.png` e `.puml`: diagrama UML da composição.
 
 Os arquivos de `build/`, `.gradle/` e o antigo `bin/` são locais e não são
 necessários para construir o projeto. No VS Code, abra a raiz e importe o projeto
@@ -90,3 +91,11 @@ compras inválidas, capacidades, estados das máquinas, rastreabilidade, cenári
 falha provocada após a inspeção e continuidade do menu. Uma condição incorreta
 lança `AssertionError` e faz o build falhar. Os casos de produção usam sementes
 fixas para que os resultados sejam reproduzíveis.
+
+## Composição da Tarefa 5
+
+`GerenciadorProducao` delega a auditoria estrutural e o acesso às etapas à
+`SalaLimpa`, que agrupa as máquinas da linha. Cada `Maquina` cria internamente
+seu `ControladorEtapa`, `SensorAlinhamento` e `AtuadorPrecisao`; a validação de
+ciclo passa por essas partes e a auditoria é apresentada de forma hierárquica.
+O diagrama de classes está em `docs/uml/` (PNG para consulta e PlantUML editável).
