@@ -9,20 +9,29 @@ java {
 }
 
 application {
-    mainClass = 'Main'
+    mainClass = 'br.unicamp.ic.mc322.Main'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
-tasks.withType(JavaExec).configureEach {
-    systemProperty 'stdout.encoding', 'UTF-8'
-    systemProperty 'stderr.encoding', 'UTF-8'
-}
-
 tasks.named('run', JavaExec) {
     standardInput = System.in
+    jvmArgs '-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8'
+}
+
+tasks.withType(JavaExec).configureEach {
+    defaultCharacterEncoding = 'UTF-8'
 }
 
 tasks.named('javadoc', Javadoc) {
@@ -31,15 +40,17 @@ tasks.named('javadoc', Javadoc) {
     options.docEncoding = 'UTF-8'
 }
 
-// Os testes usam apenas Java, como a fábrica.
+// Mantém verificações legadas como parte das tarefas Gradle.
 tasks.register('verificarFabrica', JavaExec) {
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'TesteFabrica'
+    mainClass = 'br.unicamp.ic.mc322.VerificadorFabrica'
 }
 
-tasks.named('test') {
+tasks.named('test', Test) {
     dependsOn verificarFabrica
-    // A verificação acima tem entrada própria, sem JUnit.
-    failOnNoDiscoveredTests = false
+    useJUnitPlatform()
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    maxParallelForks = 1
 }

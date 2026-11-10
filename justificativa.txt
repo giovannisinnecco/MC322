@@ -50,9 +50,9 @@ O console usa o tema SILICON FAB e agrupa demandas, fabricação e consultas em 
 
 7. Encapsulamento, limites e validação
 
-Atributos são privados e consultas de listas não permitem alterar sua estrutura. Métodos validam quantidades e valores finitos. Não há concorrência de threads: os pedidos competem pela seleção e pelos recursos em uma linha sequencial. Não há persistência nem espera real. O orçamento é verificado antes de iniciar cada unidade, evitando ciclos iniciados sem dinheiro para todas as etapas.
+Atributos são privados e consultas de listas não permitem alterar sua estrutura. Métodos validam quantidades e valores finitos. Não há concorrência de threads: os pedidos competem pela seleção e pelos recursos em uma linha sequencial. A persistência XML cobre o estado operacional descrito no README; históricos e dados transitórios permanecem em memória. Não há espera real. O orçamento é verificado antes de iniciar cada unidade, evitando ciclos iniciados sem dinheiro para todas as etapas.
 
-A aplicação e os testes não requerem bibliotecas externas. O Gradle Wrapper é a ferramenta oficial de construção a partir da tarefa 4. Os comandos de build, execução e documentação estão no README.md.
+A aplicação não requer bibliotecas externas em tempo de execução; os testes usam JUnit 5. O Gradle Wrapper é a ferramenta oficial de construção a partir da tarefa 4. Os comandos de build, execução e documentação estão no README.md.
 
 8. Capacidade, abastecimento e estoque mínimo
 
@@ -70,7 +70,7 @@ Outra expansão possível é planejar manutenção preventiva a partir da saúde
 
 10. Gradle e documentação da tarefa 4
 
-Movemos os fontes para src/main/java, mantendo as classes sem pacotes e os nomes já usados. O plugin application cuida da compilação e da execução de Main com Java 25. O Gradle Wrapper 9.1.0 acompanha o projeto com scripts para Windows e Linux/macOS e verifica o SHA-256 da distribuição. A primeira execução baixa o Gradle; as seguintes reutilizam esse download. Nenhum arquivo compilado em bin ou build é necessário para começar.
+Movemos os fontes para src/main/java, organizados nos pacotes de modelo, serviço, estratégia, exceção e persistência, preservando os nomes das classes já usados. O plugin application cuida da compilação e da execução de Main com Java 25. O Gradle Wrapper 9.1.0 acompanha o projeto com scripts para Windows e Linux/macOS e verifica o SHA-256 da distribuição. A primeira execução baixa o Gradle; as seguintes reutilizam esse download. Nenhum arquivo compilado em bin ou build é necessário para começar.
 
 O Javadoc fica diretamente nas classes, interfaces, enums e métodos, com parâmetros, retornos, exceções e autoria. Mantivemos explicações curtas em português e os comentários de lógica no formato que já usávamos. A documentação gerada fica em build/docs/javadoc/index.html.
 
@@ -86,7 +86,7 @@ O catch de RuntimeException fica restrito ao ciclo, onde existe uma recuperaçã
 
 12. Verificações da tarefa 4
 
-TesteFabrica usa Java puro e lança AssertionError quando uma condição não é atendida. A tarefa verificarFabrica é chamada por test e build. Os casos cobrem regras herdadas, transições, recursos insuficientes, compra, capacidade, cenários e menu. Uma estação de teste lança um erro depois de inspecionar para verificar que os recursos e contadores do ciclo são restaurados, inclusive quando um chip anterior já foi concluído. Sementes fixas tornam esses casos reproduzíveis.
+VerificadorFabrica mantém as verificações legadas da fábrica e lança AssertionError quando uma condição não é atendida. A tarefa verificarFabrica é chamada por test e build. Os casos cobrem regras herdadas, transições, recursos insuficientes, compra, capacidade, cenários e menu. PersistenciaPlantaTest usa JUnit 5 para verificar gravação e recuperação de estoque, máquinas e demandas, além de arquivos ausentes, corrompidos e violações de regras de negócio. Os casos de persistência usam diretórios temporários isolados. Uma estação de teste lança um erro depois de inspecionar para verificar que os recursos e contadores do ciclo são restaurados, inclusive quando um chip anterior já foi concluído. Sementes fixas tornam esses casos reproduzíveis.
 
 13. Composição e agrupamento da tarefa 5
 
